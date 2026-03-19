@@ -8,6 +8,7 @@ import {
   Tag,
   Receipt,
   ShoppingCart,
+  Target,
   Menu,
   X,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/promocoes", label: "Promoções", icon: Tag },
   { href: "/notas", label: "Notas Fiscais", icon: Receipt },
   { href: "/lista", label: "Lista de Compras", icon: ShoppingCart },
+  { href: "/necessidades", label: "Necessidades", icon: Target },
 ];
 
 export function Sidebar() {
