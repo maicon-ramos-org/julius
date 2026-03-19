@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { receipts, receiptItems, products, markets, prices } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 
 // POST /api/receipts — salvar nota fiscal processada
 export async function POST(req: NextRequest) {
@@ -9,59 +10,111 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { marketId, marketName, total, date, imageUrl, items } = body;
 
-    let mId = marketId;
-    if (!mId && marketName) {
-      const existing = await db.select().from(markets).where(eq(markets.name, marketName)).limit(1);
+    // Validate required fields
+    const validTotal = positiveNumber(total);
+    const validDate = sanitize(date);
+
+    if (!validTotal || !validDate) {
+      return NextResponse.json(
+        { error: "Missing or invalid total/date" },
+        { status: 400 }
+      );
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(validDate)) {
+      return NextResponse.json(
+        { error: "Invalid date format. Use YYYY-MM-DD" },
+        { status: 400 }
+      );
+    }
+
+    let mId = positiveInt(marketId);
+    const mName = sanitize(marketName);
+
+    if (!mId && mName) {
+      const existing = await db
+        .select()
+        .from(markets)
+        .where(eq(markets.name, mName))
+        .limit(1);
       if (existing.length > 0) {
         mId = existing[0].id;
       } else {
-        const [newMarket] = await db.insert(markets).values({ name: marketName }).returning();
+        const [newMarket] = await db
+          .insert(markets)
+          .values({ name: mName })
+          .returning();
         mId = newMarket.id;
       }
     }
 
-    if (!mId || !total || !date) {
-      return NextResponse.json({ error: "Missing marketId/total/date" }, { status: 400 });
+    if (!mId) {
+      return NextResponse.json(
+        { error: "Missing marketId or marketName" },
+        { status: 400 }
+      );
     }
 
     // Criar receipt
-    const [receipt] = await db.insert(receipts).values({
-      marketId: mId,
-      total: String(total),
-      date,
-      imageUrl: imageUrl || null,
-    }).returning();
+    const [receipt] = await db
+      .insert(receipts)
+      .values({
+        marketId: mId,
+        total: String(validTotal),
+        date: validDate,
+        imageUrl: sanitize(imageUrl) || null,
+      })
+      .returning();
 
     // Inserir items
     const insertedItems = [];
     if (items && Array.isArray(items)) {
       for (const item of items) {
-        let pId = item.productId;
+        let pId = positiveInt(item.productId);
+        const pName = sanitize(item.productName);
 
-        if (!pId && item.productName) {
-          const existing = await db.select().from(products).where(eq(products.name, item.productName)).limit(1);
+        if (!pId && pName) {
+          const existing = await db
+            .select()
+            .from(products)
+            .where(eq(products.name, pName))
+            .limit(1);
           if (existing.length > 0) {
             pId = existing[0].id;
           } else {
-            const [newProduct] = await db.insert(products).values({
-              name: item.productName,
-              brand: item.brand || null,
-              category: item.category || null,
-              unit: item.unit || null,
-            }).returning();
+            const [newProduct] = await db
+              .insert(products)
+              .values({
+                name: pName,
+                brand: sanitize(item.brand) || null,
+                category: sanitize(item.category) || null,
+                unit: sanitize(item.unit) || null,
+              })
+              .returning();
             pId = newProduct.id;
           }
         }
 
         if (!pId) continue;
 
-        const [ri] = await db.insert(receiptItems).values({
-          receiptId: receipt.id,
-          productId: pId,
-          quantity: String(item.quantity || 1),
-          unitPrice: String(item.unitPrice),
-          totalPrice: String(item.totalPrice || item.unitPrice * (item.quantity || 1)),
-        }).returning();
+        const unitPrice = positiveNumber(item.unitPrice);
+        if (!unitPrice) continue;
+
+        const quantity = positiveNumber(item.quantity) || 1;
+        const totalPrice =
+          positiveNumber(item.totalPrice) || unitPrice * quantity;
+
+        const [ri] = await db
+          .insert(receiptItems)
+          .values({
+            receiptId: receipt.id,
+            productId: pId,
+            quantity: String(quantity),
+            unitPrice: String(unitPrice),
+            totalPrice: String(totalPrice),
+          })
+          .returning();
 
         insertedItems.push(ri);
 
@@ -69,7 +122,7 @@ export async function POST(req: NextRequest) {
         await db.insert(prices).values({
           productId: pId,
           marketId: mId,
-          price: String(item.unitPrice),
+          price: String(unitPrice),
           source: "receipt",
         });
       }
@@ -78,7 +131,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, receipt, items: insertedItems });
   } catch (error) {
     console.error("Error saving receipt:", error);
-    return NextResponse.json({ error: "Failed to save receipt" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save receipt" },
+      { status: 500 }
+    );
   }
 }
 
@@ -102,6 +158,9 @@ export async function GET() {
     return NextResponse.json(allReceipts);
   } catch (error) {
     console.error("Error fetching receipts:", error);
-    return NextResponse.json({ error: "Failed to fetch receipts" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch receipts" },
+      { status: 500 }
+    );
   }
 }

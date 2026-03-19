@@ -11,9 +11,11 @@ import {
   Target,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { signOut } from "@/lib/auth-client";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -80,6 +82,19 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-200">
+          <button
+            onClick={async () => {
+              await signOut();
+              window.location.href = "/login";
+            }}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors w-full"
+          >
+            <LogOut size={20} />
+            Sair
+          </button>
+        </div>
       </aside>
     </>
   );

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { prices, products, markets } from "@/db/schema";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, gte } from "drizzle-orm";
+import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 
 // POST /api/prices — salvar preços extraídos de promoções
 export async function POST(req: NextRequest) {
@@ -11,35 +12,60 @@ export async function POST(req: NextRequest) {
     // Suporta array ou objeto único
     const items = Array.isArray(body) ? body : [body];
 
+    if (items.length > 100) {
+      return NextResponse.json(
+        { error: "Maximum 100 items per request" },
+        { status: 400 }
+      );
+    }
+
     const results = [];
     for (const item of items) {
-      const { productId, marketId, price, source = "promo", promoValidUntil, productName, marketName, brand, category, unit } = item;
+      const price = positiveNumber(item.price);
+      const source = item.source === "receipt" ? "receipt" : "promo";
 
-      let pId = productId;
-      let mId = marketId;
+      let pId = positiveInt(item.productId);
+      let mId = positiveInt(item.marketId);
+
+      const productName = sanitize(item.productName);
+      const marketName = sanitize(item.marketName);
 
       // Se mandou nome ao invés de ID, criar/buscar
       if (!pId && productName) {
-        const existing = await db.select().from(products).where(eq(products.name, productName)).limit(1);
+        const existing = await db
+          .select()
+          .from(products)
+          .where(eq(products.name, productName))
+          .limit(1);
         if (existing.length > 0) {
           pId = existing[0].id;
         } else {
-          const [newProduct] = await db.insert(products).values({
-            name: productName,
-            brand: brand || null,
-            category: category || null,
-            unit: unit || null,
-          }).returning();
+          const [newProduct] = await db
+            .insert(products)
+            .values({
+              name: productName,
+              brand: sanitize(item.brand) || null,
+              category: sanitize(item.category) || null,
+              unit: sanitize(item.unit) || null,
+            })
+            .returning();
           pId = newProduct.id;
         }
       }
 
       if (!mId && marketName) {
-        const existing = await db.select().from(markets).where(eq(markets.name, marketName)).limit(1);
+        const existing = await db
+          .select()
+          .from(markets)
+          .where(eq(markets.name, marketName))
+          .limit(1);
         if (existing.length > 0) {
           mId = existing[0].id;
         } else {
-          const [newMarket] = await db.insert(markets).values({ name: marketName }).returning();
+          const [newMarket] = await db
+            .insert(markets)
+            .values({ name: marketName })
+            .returning();
           mId = newMarket.id;
         }
       }
@@ -49,13 +75,24 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const [inserted] = await db.insert(prices).values({
-        productId: pId,
-        marketId: mId,
-        price: String(price),
-        source,
-        promoValidUntil: promoValidUntil ? new Date(promoValidUntil) : null,
-      }).returning();
+      let promoValidUntil: Date | null = null;
+      if (item.promoValidUntil) {
+        const d = new Date(item.promoValidUntil);
+        if (!isNaN(d.getTime())) {
+          promoValidUntil = d;
+        }
+      }
+
+      const [inserted] = await db
+        .insert(prices)
+        .values({
+          productId: pId,
+          marketId: mId,
+          price: String(price),
+          source,
+          promoValidUntil,
+        })
+        .returning();
 
       results.push(inserted);
     }
@@ -63,7 +100,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: results });
   } catch (error) {
     console.error("Error saving prices:", error);
-    return NextResponse.json({ error: "Failed to save prices" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save prices" },
+      { status: 500 }
+    );
   }
 }
 
@@ -96,6 +136,9 @@ export async function GET() {
     return NextResponse.json(recentPrices);
   } catch (error) {
     console.error("Error fetching prices:", error);
-    return NextResponse.json({ error: "Failed to fetch prices" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch prices" },
+      { status: 500 }
+    );
   }
 }
