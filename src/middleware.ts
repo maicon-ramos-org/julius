@@ -21,8 +21,18 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(NextResponse.next());
   }
 
-  // Protect API routes — check session cookie exists
+  // Protect API routes — check API key or session cookie
   if (pathname.startsWith("/api/")) {
+    // Check API key first (for agent/programmatic access)
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const apiKey = authHeader.slice(7);
+      if (apiKey === process.env.JULIUS_API_KEY) {
+        return addSecurityHeaders(NextResponse.next());
+      }
+    }
+
+    // Fall back to session cookie (browser users)
     const sessionToken =
       request.cookies.get("better-auth.session_token")?.value ||
       request.cookies.get("__Secure-better-auth.session_token")?.value;
