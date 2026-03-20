@@ -5,40 +5,27 @@ const publicPaths = ["/api/auth", "/login"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow auth routes and login page
-  if (publicPaths.some((p) => pathname.startsWith(p))) {
+  // Allow auth API routes
+  if (pathname.startsWith("/api/auth")) {
     return addSecurityHeaders(NextResponse.next());
   }
 
-  // Protect API routes — check session cookie
+  // Login page: if already has session cookie, redirect to home
+  if (pathname.startsWith("/login")) {
+    const sessionToken =
+      request.cookies.get("better-auth.session_token")?.value;
+    if (sessionToken) {
+      return addSecurityHeaders(NextResponse.redirect(new URL("/", request.url)));
+    }
+    return addSecurityHeaders(NextResponse.next());
+  }
+
+  // Protect API routes — check session cookie exists
   if (pathname.startsWith("/api/")) {
     const sessionToken =
       request.cookies.get("better-auth.session_token")?.value;
 
     if (!sessionToken) {
-      return addSecurityHeaders(
-        NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      );
-    }
-
-    // Validate session with better-auth
-    const res = await fetch(
-      `${request.nextUrl.origin}/api/auth/get-session`,
-      {
-        headers: {
-          cookie: request.headers.get("cookie") || "",
-        },
-      }
-    );
-
-    if (!res.ok) {
-      return addSecurityHeaders(
-        NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      );
-    }
-
-    const session = await res.json();
-    if (!session?.session) {
       return addSecurityHeaders(
         NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       );

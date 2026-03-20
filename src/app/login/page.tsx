@@ -50,8 +50,8 @@ export default function LoginPage() {
         }
       }
 
-      router.push(callbackUrl);
-      router.refresh();
+      // Force full page navigation to ensure cookies are sent with the request
+      window.location.href = callbackUrl;
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
