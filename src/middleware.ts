@@ -13,7 +13,8 @@ export async function middleware(request: NextRequest) {
   // Login page: if already has session cookie, redirect to home
   if (pathname.startsWith("/login")) {
     const sessionToken =
-      request.cookies.get("better-auth.session_token")?.value;
+      request.cookies.get("better-auth.session_token")?.value ||
+      request.cookies.get("__Secure-better-auth.session_token")?.value;
     if (sessionToken) {
       return addSecurityHeaders(NextResponse.redirect(new URL("/", request.url)));
     }
@@ -23,7 +24,8 @@ export async function middleware(request: NextRequest) {
   // Protect API routes — check session cookie exists
   if (pathname.startsWith("/api/")) {
     const sessionToken =
-      request.cookies.get("better-auth.session_token")?.value;
+      request.cookies.get("better-auth.session_token")?.value ||
+      request.cookies.get("__Secure-better-auth.session_token")?.value;
 
     if (!sessionToken) {
       return addSecurityHeaders(
@@ -36,7 +38,8 @@ export async function middleware(request: NextRequest) {
 
   // Protect app pages — redirect to login if not authenticated
   const sessionToken =
-    request.cookies.get("better-auth.session_token")?.value;
+    request.cookies.get("better-auth.session_token")?.value ||
+    request.cookies.get("__Secure-better-auth.session_token")?.value;
 
   if (!sessionToken) {
     const loginUrl = new URL("/login", request.url);
