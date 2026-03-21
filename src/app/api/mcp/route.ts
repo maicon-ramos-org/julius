@@ -7,6 +7,7 @@ import { eq, desc, gte, and, sql, or, isNull } from "drizzle-orm";
 import { sanitize, positiveNumber } from "@/lib/validation";
 import { matchAndPersist, rematchAllProducts } from "@/lib/match-engine";
 import { getProductStats, getBestPrice } from "@/lib/price-analytics";
+import { fetchAndParseNfce } from "@/lib/nfce-parser";
 
 function createServer() {
   const server = new McpServer(
@@ -486,6 +487,107 @@ function createServer() {
       return {
         content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
       };
+    }
+  );
+
+  // ──────────────────────────────────────────────
+  // Tool: parse_nfce_qrcode
+  // ──────────────────────────────────────────────
+  server.registerTool(
+    "parse_nfce_qrcode",
+    {
+      title: "Parsear QR code de NFCe",
+      description:
+        "Recebe a URL do QR code de uma Nota Fiscal do Consumidor (NFCe) e extrai " +
+        "os itens, preços, mercado e data. Retorna dados estruturados prontos para " +
+        "serem enviados ao register_receipt. " +
+        "Use quando o usuário enviar um QR code de cupom fiscal.",
+      inputSchema: {
+        url: z.string().describe("URL do QR code da NFCe (contém chNFe=...)"),
+        autoRegister: z.boolean().optional().describe(
+          "Se true, registra automaticamente como receipt no Julius (default: false)"
+        ),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async ({ url, autoRegister }) => {
+      try {
+        const nfce = await fetchAndParseNfce(url);
+
+        if (nfce.items.length === 0) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({
+                success: false,
+                error: "Não foi possível extrair itens da NFCe. A página pode ter formato inesperado ou estar indisponível.",
+                accessKey: nfce.accessKey,
+                marketName: nfce.marketName,
+              }, null, 2),
+            }],
+          };
+        }
+
+        // Optionally auto-register as receipt
+        if (autoRegister && nfce.date && nfce.marketName) {
+          const receiptPayload = {
+            marketName: nfce.marketName,
+            total: nfce.totalValue || nfce.items.reduce((s, i) => s + i.totalPrice, 0),
+            date: nfce.date,
+            items: nfce.items.map((item) => ({
+              productName: item.name,
+              unitPrice: item.unitPrice,
+              quantity: item.quantity,
+              totalPrice: item.totalPrice,
+              unit: item.unit,
+            })),
+          };
+
+          const response = await fetch(
+            new URL("/api/receipts", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.JULIUS_API_KEY}`,
+              },
+              body: JSON.stringify(receiptPayload),
+            }
+          );
+          const receiptResult = await response.json();
+
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({
+                success: true,
+                parsed: nfce,
+                registered: true,
+                receiptResult,
+              }, null, 2),
+            }],
+          };
+        }
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              success: true,
+              parsed: nfce,
+              registered: false,
+              hint: "Use register_receipt com estes dados para salvar no Julius.",
+            }, null, 2),
+          }],
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Erro ao parsear NFCe: ${error instanceof Error ? error.message : "erro desconhecido"}`,
+          }],
+        };
+      }
     }
   );
 

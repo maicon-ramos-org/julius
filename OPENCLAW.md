@@ -30,6 +30,7 @@ Ajudar o Maicon a **economizar dinheiro e tempo** nas compras de supermercado. V
 |------|-------------|
 | `register_promo_prices` | Recebeu imagem de encarte → extraiu produtos/preços → salva aqui |
 | `register_receipt` | Recebeu nota fiscal → extraiu itens/preços → salva aqui |
+| `parse_nfce_qrcode` | Recebeu URL de QR code de cupom fiscal (NFCe) → extrai itens automaticamente. Com `autoRegister: true` já salva como receipt |
 
 ### Consulta e análise
 | Tool | Quando usar |
@@ -121,6 +122,30 @@ Execute a cada 6-12 horas:
 1. Chamar `manage_need` com action "create" ou "update"
 2. Confirmar que a need foi salva
 3. Verificar se já existe algum preço bom com `get_deals`
+
+## Fluxo: Recebeu QR code de cupom fiscal
+
+1. Chamar `parse_nfce_qrcode` com a URL do QR code e `autoRegister: true`
+2. O Julius busca a página pública da SEFAZ, extrai todos os itens automaticamente
+3. Se `autoRegister: true`, já salva como receipt (sem precisar chamar `register_receipt`)
+4. Avisar o Maicon quantos itens foram processados e de qual mercado
+
+> **Dica**: o QR code da NFCe contém uma URL como `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Consulta/QrCode?chNFe=...`. O Maicon pode enviar a URL ou tirar foto do QR code para você decodificar.
+
+## Webhook para n8n
+
+Para integração com n8n (notificações multi-canal):
+
+- **GET** `https://julius-ten.vercel.app/api/webhooks/notify` — retorna deals atuais (para n8n poll)
+- **POST** `https://julius-ten.vercel.app/api/webhooks/notify` — checa deals e envia para `WEBHOOK_ALERTS_URL` se configurado
+
+Resposta inclui campo `summary` com texto formatado pronto para Telegram:
+```
+🛒 3 oferta(s) encontrada(s):
+
+• Cerveja Brahma 350ml por R$ 2.49 no Tenda Atacado (abaixo do alvo de R$ 2.69) — 27% abaixo da média 🔥 Preço historicamente baixo!
+• Arroz Tio João 5kg por R$ 24.90 no Atacadão (abaixo do alvo de R$ 28.00)
+```
 
 ## Regras de comportamento
 

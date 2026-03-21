@@ -142,10 +142,18 @@ Atacadão, Tenda Atacado, Assaí Atacadista, Arena Atacado, Morete Supermercados
 - `GET /api/dashboard` — stats e resumos
 - `GET /api/shopping-list` — lista de compras com melhor preço
 
+### Webhook (para n8n)
+- `GET /api/webhooks/notify` — poll de deals atuais (retorna summary formatado para Telegram)
+- `POST /api/webhooks/notify` — checa deals e envia para WEBHOOK_ALERTS_URL se configurado
+
+### Mercados
+- `GET /api/markets` — listar mercados com stats (produtos, promos, gastos, loyalty)
+
 ### MCP Server (para agentes AI)
 - `POST /api/mcp` — Endpoint MCP (Streamable HTTP) com tools:
   - `register_promo_prices` — salvar preços de encartes
   - `register_receipt` — salvar nota fiscal com itens
+  - `parse_nfce_qrcode` — parsear QR code de NFCe (cupom fiscal brasileiro)
   - `get_deals` — ver ofertas que fazem match com needs
   - `get_best_price` — encontrar menor preço de um produto
   - `check_market_promos` — promoções válidas de um mercado
