@@ -4,6 +4,8 @@ export const markets = pgTable("markets", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 20 }),
+  loyaltyProgram: varchar("loyalty_program", { length: 255 }),
+  hasLoyalty: boolean("has_loyalty").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -13,6 +15,8 @@ export const products = pgTable("products", {
   brand: varchar("brand", { length: 255 }),
   category: varchar("category", { length: 100 }),
   unit: varchar("unit", { length: 20 }),
+  unitType: varchar("unit_type", { length: 10 }), // "kg", "g", "L", "mL", "un"
+  unitQuantity: decimal("unit_quantity", { precision: 10, scale: 3 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -22,6 +26,9 @@ export const prices = pgTable("prices", {
   marketId: integer("market_id").notNull().references(() => markets.id),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   source: varchar("source", { length: 10 }).notNull().default("promo"), // 'promo' | 'receipt'
+  priceType: varchar("price_type", { length: 20 }).notNull().default("regular"), // 'regular' | 'loyalty' | 'bulk'
+  normalizedPrice: decimal("normalized_price", { precision: 10, scale: 4 }),
+  normalizedUnit: varchar("normalized_unit", { length: 10 }), // "kg", "L", "un"
   promoValidUntil: timestamp("promo_valid_until"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

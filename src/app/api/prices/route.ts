@@ -1,8 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { prices, products, markets } from "@/db/schema";
-import { eq, desc, gte } from "drizzle-orm";
+import { eq, desc, gte, and, sql, or, isNull } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
+
+// Calculate normalized price per base unit (kg, L, or un)
+function calcNormalized(
+  price: number,
+  unitType: string | null,
+  unitQuantity: number | null
+): { normalizedPrice: string; normalizedUnit: string } | null {
+  if (!unitType || !unitQuantity || unitQuantity <= 0) return null;
+
+  let normalizedPrice: number;
+  let normalizedUnit: string;
+
+  switch (unitType) {
+    case "kg":
+      normalizedPrice = price / unitQuantity;
+      normalizedUnit = "kg";
+      break;
+    case "g":
+      normalizedPrice = (price / unitQuantity) * 1000;
+      normalizedUnit = "kg";
+      break;
+    case "L":
+      normalizedPrice = price / unitQuantity;
+      normalizedUnit = "L";
+      break;
+    case "mL":
+      normalizedPrice = (price / unitQuantity) * 1000;
+      normalizedUnit = "L";
+      break;
+    case "un":
+      normalizedPrice = price / unitQuantity;
+      normalizedUnit = "un";
+      break;
+    default:
+      return null;
+  }
+
+  return {
+    normalizedPrice: normalizedPrice.toFixed(4),
+    normalizedUnit,
+  };
+}
 
 // POST /api/prices — salvar preços extraídos de promoções
 export async function POST(req: NextRequest) {
@@ -23,12 +65,18 @@ export async function POST(req: NextRequest) {
     for (const item of items) {
       const price = positiveNumber(item.price);
       const source = item.source === "receipt" ? "receipt" : "promo";
+      const priceType = ["regular", "loyalty", "bulk"].includes(item.priceType)
+        ? item.priceType
+        : "regular";
 
       let pId = positiveInt(item.productId);
       let mId = positiveInt(item.marketId);
 
       const productName = sanitize(item.productName);
       const marketName = sanitize(item.marketName);
+
+      const itemUnitType = sanitize(item.unitType);
+      const itemUnitQuantity = positiveNumber(item.unitQuantity);
 
       // Se mandou nome ao invés de ID, criar/buscar
       if (!pId && productName) {
@@ -47,17 +95,20 @@ export async function POST(req: NextRequest) {
               brand: sanitize(item.brand) || null,
               category: sanitize(item.category) || null,
               unit: sanitize(item.unit) || null,
+              unitType: itemUnitType || null,
+              unitQuantity: itemUnitQuantity ? String(itemUnitQuantity) : null,
             })
             .returning();
           pId = newProduct.id;
         }
       }
 
+      // Market lookup with ILIKE for case-insensitive match
       if (!mId && marketName) {
         const existing = await db
           .select()
           .from(markets)
-          .where(eq(markets.name, marketName))
+          .where(sql`LOWER(TRIM(${markets.name})) = LOWER(TRIM(${marketName}))`)
           .limit(1);
         if (existing.length > 0) {
           mId = existing[0].id;
@@ -75,6 +126,24 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Update product unitType/unitQuantity if provided and product didn't have them
+      if (itemUnitType && itemUnitQuantity) {
+        const [existingProduct] = await db
+          .select({ unitType: products.unitType, unitQuantity: products.unitQuantity })
+          .from(products)
+          .where(eq(products.id, pId))
+          .limit(1);
+        if (existingProduct && !existingProduct.unitType) {
+          await db
+            .update(products)
+            .set({
+              unitType: itemUnitType,
+              unitQuantity: String(itemUnitQuantity),
+            })
+            .where(eq(products.id, pId));
+        }
+      }
+
       let promoValidUntil: Date | null = null;
       if (item.promoValidUntil) {
         const d = new Date(item.promoValidUntil);
@@ -83,6 +152,47 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Dedup: check if same (productId, marketId, price, priceType) exists in last 24h
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+      const [duplicate] = await db
+        .select()
+        .from(prices)
+        .where(
+          and(
+            eq(prices.productId, pId),
+            eq(prices.marketId, mId),
+            eq(prices.price, String(price)),
+            eq(prices.priceType, priceType),
+            gte(prices.createdAt, oneDayAgo)
+          )
+        )
+        .limit(1);
+
+      if (duplicate) {
+        results.push({ ...duplicate, _deduplicated: true });
+        continue;
+      }
+
+      // Resolve unitType/unitQuantity for normalized price calculation
+      let effectiveUnitType = itemUnitType;
+      let effectiveUnitQuantity = itemUnitQuantity;
+      if (!effectiveUnitType || !effectiveUnitQuantity) {
+        const [prod] = await db
+          .select({ unitType: products.unitType, unitQuantity: products.unitQuantity })
+          .from(products)
+          .where(eq(products.id, pId))
+          .limit(1);
+        if (prod) {
+          effectiveUnitType = effectiveUnitType || prod.unitType;
+          effectiveUnitQuantity =
+            effectiveUnitQuantity || (prod.unitQuantity ? parseFloat(prod.unitQuantity) : null);
+        }
+      }
+
+      const normalized = calcNormalized(price, effectiveUnitType, effectiveUnitQuantity);
+
       const [inserted] = await db
         .insert(prices)
         .values({
@@ -90,6 +200,9 @@ export async function POST(req: NextRequest) {
           marketId: mId,
           price: String(price),
           source,
+          priceType,
+          normalizedPrice: normalized?.normalizedPrice || null,
+          normalizedUnit: normalized?.normalizedUnit || null,
           promoValidUntil,
         })
         .returning();
@@ -108,16 +221,35 @@ export async function POST(req: NextRequest) {
 }
 
 // GET /api/prices — listar promoções recentes (últimos 7 dias)
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const activeOnly = searchParams.get("activeOnly") === "true";
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const conditions = [gte(prices.createdAt, sevenDaysAgo)];
+
+    // Filter: only active promos (not expired) + receipts (always valid history)
+    if (activeOnly) {
+      conditions.push(
+        or(
+          isNull(prices.promoValidUntil),
+          gte(prices.promoValidUntil, new Date()),
+          eq(prices.source, "receipt")
+        )!
+      );
+    }
 
     const recentPrices = await db
       .select({
         id: prices.id,
         price: prices.price,
         source: prices.source,
+        priceType: prices.priceType,
+        normalizedPrice: prices.normalizedPrice,
+        normalizedUnit: prices.normalizedUnit,
         promoValidUntil: prices.promoValidUntil,
         createdAt: prices.createdAt,
         productName: products.name,
@@ -129,7 +261,7 @@ export async function GET() {
       .from(prices)
       .innerJoin(products, eq(prices.productId, products.id))
       .innerJoin(markets, eq(prices.marketId, markets.id))
-      .where(gte(prices.createdAt, sevenDaysAgo))
+      .where(and(...conditions))
       .orderBy(desc(prices.createdAt))
       .limit(100);
 

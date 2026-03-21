@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { receipts, receiptItems, products, markets, prices } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 
 // POST /api/receipts — salvar nota fiscal processada
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       const existing = await db
         .select()
         .from(markets)
-        .where(eq(markets.name, mName))
+        .where(sql`LOWER(TRIM(${markets.name})) = LOWER(TRIM(${mName}))`)
         .limit(1);
       if (existing.length > 0) {
         mId = existing[0].id;
