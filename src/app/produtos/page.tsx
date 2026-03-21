@@ -12,13 +12,13 @@ interface Product {
   brand: string | null;
   category: string | null;
   unit: string | null;
-  bestPrice: { price: string; marketName: string } | null;
-  latestPrices: Array<{
+  unitType: string | null;
+  unitQuantity: string | null;
+  bestPrice: {
     price: string;
-    marketName: string;
-    source: string;
-    createdAt: string;
-  }>;
+    marketName: string | null;
+    source: string | null;
+  } | null;
 }
 
 export default function ProdutosPage() {
@@ -69,7 +69,7 @@ export default function ProdutosPage() {
           <CardContent className="py-8 text-center">
             <p className="text-gray-500">
               {products.length === 0
-                ? "Nenhum produto cadastrado. Use a API para adicionar produtos."
+                ? "Nenhum produto cadastrado."
                 : "Nenhum produto encontrado."}
             </p>
           </CardContent>
@@ -95,36 +95,40 @@ export default function ProdutosPage() {
                       )}
                     </div>
                   </div>
-                  {product.unit && (
-                    <span className="text-xs text-gray-400">{product.unit}</span>
+                  {product.unitType && (
+                    <span className="text-xs text-gray-400">
+                      {product.unitQuantity && parseFloat(product.unitQuantity) !== 1
+                        ? `${product.unitQuantity}${product.unitType}`
+                        : product.unitType}
+                    </span>
                   )}
                 </div>
               </CardHeader>
               <CardContent>
                 {product.bestPrice ? (
-                  <div className="flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4 text-green-600" />
-                    <span className="text-lg font-bold text-green-600">
-                      R$ {parseFloat(product.bestPrice.price).toFixed(2)}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      @ {product.bestPrice.marketName}
-                    </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4 text-green-600" />
+                      <span className="text-lg font-bold text-green-600">
+                        R$ {parseFloat(product.bestPrice.price).toFixed(2)}
+                      </span>
+                      {product.bestPrice.marketName && (
+                        <span className="text-xs text-gray-500">
+                          @ {product.bestPrice.marketName}
+                        </span>
+                      )}
+                    </div>
+                    {product.bestPrice.source && (
+                      <Badge
+                        variant={product.bestPrice.source === "promo" ? "default" : "secondary"}
+                        className="text-xs mt-1"
+                      >
+                        {product.bestPrice.source === "promo" ? "encarte" : "nota"}
+                      </Badge>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">Sem preço registrado</p>
-                )}
-
-                {product.latestPrices.length > 1 && (
-                  <div className="mt-3 space-y-1">
-                    <p className="text-xs font-medium text-gray-500">Outros preços:</p>
-                    {product.latestPrices.slice(0, 4).map((lp, i) => (
-                      <div key={i} className="flex justify-between text-xs text-gray-600">
-                        <span>{lp.marketName}</span>
-                        <span>R$ {parseFloat(lp.price).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
                 )}
               </CardContent>
             </Card>

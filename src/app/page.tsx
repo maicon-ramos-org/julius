@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, Store, DollarSign, Tag } from "lucide-react";
+import { Package, Store, DollarSign, Tag, TrendingDown, Target } from "lucide-react";
 import { StatCard } from "@/components/stat-card";
 import { SpendingChart } from "@/components/spending-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,14 +25,34 @@ interface DashboardData {
   }>;
 }
 
+interface DealAlert {
+  needName: string;
+  targetPrice: number | null;
+  deals: Array<{
+    productName: string;
+    currentPrice: number;
+    marketName: string;
+    percentBelowAvg: number | null;
+    isGoodDeal: boolean;
+    isBelowTarget: boolean;
+    isPreferred: boolean;
+  }>;
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [deals, setDeals] = useState<DealAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then(setData)
+    Promise.all([
+      fetch("/api/dashboard").then((r) => r.json()),
+      fetch("/api/alerts?onlyDeals=true").then((r) => r.json()).catch(() => []),
+    ])
+      .then(([dashData, dealsData]) => {
+        setData(dashData);
+        if (Array.isArray(dealsData)) setDeals(dealsData);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -88,6 +108,61 @@ export default function DashboardPage() {
           description="preços registrados"
         />
       </div>
+
+      {/* Deals / Alerts */}
+      {deals.length > 0 && (
+        <Card className="border-green-200 bg-green-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Target size={20} className="text-green-600" />
+              Ofertas para você
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {deals.flatMap((deal) =>
+                deal.deals.slice(0, 2).map((d, i) => (
+                  <div
+                    key={`${deal.needName}-${i}`}
+                    className="flex items-center justify-between bg-white rounded-lg p-3 shadow-sm"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{d.productName}</p>
+                        {d.isGoodDeal && (
+                          <Badge className="text-xs bg-green-600">
+                            <TrendingDown size={10} className="mr-1" />
+                            Bom preço
+                          </Badge>
+                        )}
+                        {d.isPreferred && (
+                          <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">
+                            Preferida
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        📍 {d.marketName} · Need: {deal.needName}
+                        {deal.targetPrice && ` · Alvo: R$ ${deal.targetPrice.toFixed(2)}`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-600">
+                        R$ {d.currentPrice.toFixed(2)}
+                      </p>
+                      {d.percentBelowAvg !== null && d.percentBelowAvg > 0 && (
+                        <p className="text-xs text-green-600">
+                          {d.percentBelowAvg.toFixed(0)}% abaixo da média
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

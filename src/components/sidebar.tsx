@@ -9,6 +9,7 @@ import {
   Receipt,
   ShoppingCart,
   Target,
+  Store,
   Menu,
   X,
   LogOut,
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/promocoes", label: "Promoções", icon: Tag },
   { href: "/notas", label: "Notas Fiscais", icon: Receipt },
   { href: "/lista", label: "Lista de Compras", icon: ShoppingCart },
+  { href: "/mercados", label: "Mercados", icon: Store },
   { href: "/necessidades", label: "Necessidades", icon: Target },
 ];
 
