@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { shoppingList, products, prices, markets } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql, gte, and } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 
-// GET /api/shopping-list
+// GET /api/shopping-list — single query, no N+1
 export async function GET() {
   try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Subquery: best price per product in last 7 days
+    const bestPriceSub = db
+      .select({
+        productId: prices.productId,
+        minPrice: sql<string>`MIN(${prices.price}::numeric)`.as("min_price"),
+      })
+      .from(prices)
+      .where(gte(prices.createdAt, sevenDaysAgo))
+      .groupBy(prices.productId)
+      .as("best_price");
+
+    // Main query: shopping list + product + best price
     const items = await db
       .select({
         id: shoppingList.id,
@@ -17,47 +32,62 @@ export async function GET() {
         productName: products.name,
         productBrand: products.brand,
         productUnit: products.unit,
+        bestPrice: bestPriceSub.minPrice,
       })
       .from(shoppingList)
       .innerJoin(products, eq(shoppingList.productId, products.id))
+      .leftJoin(bestPriceSub, eq(shoppingList.productId, bestPriceSub.productId))
       .orderBy(shoppingList.createdAt);
 
-    // Enriquecer com melhor preço
-    const enriched = await Promise.all(
-      items.map(async (item) => {
-        const latestPrices = await db
-          .select({
-            price: prices.price,
-            marketName: markets.name,
-          })
-          .from(prices)
-          .innerJoin(markets, eq(prices.marketId, markets.id))
-          .where(eq(prices.productId, item.productId))
-          .orderBy(desc(prices.createdAt))
-          .limit(6);
+    // Batch: get market names for products that have a best price
+    const productIds = items
+      .filter((i) => i.bestPrice !== null)
+      .map((i) => i.productId);
 
-        const bestPrice =
-          latestPrices.length > 0
-            ? latestPrices.reduce((min, p) =>
-                parseFloat(p.price) < parseFloat(min.price) ? p : min
-              )
-            : null;
+    let priceMarketMap: Record<number, string> = {};
 
-        return {
-          id: item.id,
-          quantity: item.quantity,
-          notes: item.notes,
-          checked: item.checked,
-          product: {
-            id: item.productId,
-            name: item.productName,
-            brand: item.productBrand,
-            unit: item.productUnit,
-          },
-          bestPrice,
-        };
-      })
-    );
+    if (productIds.length > 0) {
+      const priceDetails = await db
+        .select({
+          productId: prices.productId,
+          price: prices.price,
+          marketName: markets.name,
+        })
+        .from(prices)
+        .innerJoin(markets, eq(prices.marketId, markets.id))
+        .where(
+          and(
+            sql`${prices.productId} IN (${sql.join(productIds.map(id => sql`${id}`), sql`, `)})`,
+            gte(prices.createdAt, sevenDaysAgo)
+          )
+        )
+        .orderBy(sql`${prices.price}::numeric ASC`);
+
+      for (const pd of priceDetails) {
+        if (!priceMarketMap[pd.productId]) {
+          priceMarketMap[pd.productId] = pd.marketName;
+        }
+      }
+    }
+
+    const enriched = items.map((item) => ({
+      id: item.id,
+      quantity: item.quantity,
+      notes: item.notes,
+      checked: item.checked,
+      product: {
+        id: item.productId,
+        name: item.productName,
+        brand: item.productBrand,
+        unit: item.productUnit,
+      },
+      bestPrice: item.bestPrice
+        ? {
+            price: item.bestPrice,
+            marketName: priceMarketMap[item.productId] || null,
+          }
+        : null,
+    }));
 
     return NextResponse.json(enriched);
   } catch (error) {

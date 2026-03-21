@@ -4,6 +4,7 @@ import { prices, products, markets } from "@/db/schema";
 import { eq, desc, gte, and, sql, or, isNull } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 import { matchAndPersist } from "@/lib/match-engine";
+import { findOrCreateMarket } from "@/lib/market-lookup";
 
 // Calculate normalized price per base unit (kg, L, or un)
 function calcNormalized(
@@ -104,22 +105,9 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Market lookup with ILIKE for case-insensitive match
+      // Market lookup with accent/whitespace normalization
       if (!mId && marketName) {
-        const existing = await db
-          .select()
-          .from(markets)
-          .where(sql`LOWER(TRIM(${markets.name})) = LOWER(TRIM(${marketName}))`)
-          .limit(1);
-        if (existing.length > 0) {
-          mId = existing[0].id;
-        } else {
-          const [newMarket] = await db
-            .insert(markets)
-            .values({ name: marketName })
-            .returning();
-          mId = newMarket.id;
-        }
+        mId = await findOrCreateMarket(marketName);
       }
 
       if (!pId || !mId || !price) {

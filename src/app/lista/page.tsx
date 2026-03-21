@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ShoppingCart, MapPin, Plus, Trash2 } from "lucide-react";
 
 interface ShoppingItem {
   id: number;
@@ -26,8 +28,11 @@ interface ShoppingItem {
 export default function ListaPage() {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQty, setNewItemQty] = useState("1");
+  const [adding, setAdding] = useState(false);
 
-  useEffect(() => {
+  const fetchItems = () => {
     fetch("/api/shopping-list")
       .then((r) => r.json())
       .then((data) => {
@@ -35,17 +40,51 @@ export default function ListaPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchItems();
   }, []);
 
   const toggleItem = async (id: number, checked: boolean) => {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, checked } : item))
     );
-    // Atualizar no backend
     await fetch("/api/shopping-list", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, checked }),
+    }).catch(console.error);
+  };
+
+  const addItem = async () => {
+    if (!newItemName.trim()) return;
+    setAdding(true);
+    try {
+      await fetch("/api/shopping-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productName: newItemName.trim(),
+          quantity: parseFloat(newItemQty) || 1,
+        }),
+      });
+      setNewItemName("");
+      setNewItemQty("1");
+      fetchItems();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const deleteItem = async (id: number) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+    await fetch("/api/shopping-list", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
     }).catch(console.error);
   };
 
@@ -71,6 +110,38 @@ export default function ListaPage() {
         <p className="text-gray-500">Itens organizados pelo melhor mercado</p>
       </div>
 
+      {/* Adicionar item */}
+      <Card>
+        <CardContent className="py-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              addItem();
+            }}
+            className="flex gap-2"
+          >
+            <Input
+              placeholder="Nome do produto..."
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={newItemQty}
+              onChange={(e) => setNewItemQty(e.target.value)}
+              className="w-20"
+            />
+            <Button type="submit" disabled={adding || !newItemName.trim()}>
+              <Plus size={16} className="mr-1" />
+              Adicionar
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
       {loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
@@ -81,7 +152,7 @@ export default function ListaPage() {
             <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">Lista de compras vazia.</p>
             <p className="text-sm text-gray-400 mt-1">
-              Use POST /api/shopping-list para adicionar itens.
+              Adicione itens usando o campo acima.
             </p>
           </CardContent>
         </Card>
@@ -139,6 +210,12 @@ export default function ListaPage() {
                           R$ {(parseFloat(item.bestPrice.price) * parseFloat(item.quantity)).toFixed(2)}
                         </span>
                       )}
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>

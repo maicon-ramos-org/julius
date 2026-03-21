@@ -4,6 +4,7 @@ import { receipts, receiptItems, products, markets, prices, needs } from "@/db/s
 import { eq, desc, sql } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 import { matchAndPersist, matchProductToNeeds, getActiveNeeds } from "@/lib/match-engine";
+import { findOrCreateMarket } from "@/lib/market-lookup";
 
 // POST /api/receipts — salvar nota fiscal processada
 export async function POST(req: NextRequest) {
@@ -34,20 +35,7 @@ export async function POST(req: NextRequest) {
     const mName = sanitize(marketName);
 
     if (!mId && mName) {
-      const existing = await db
-        .select()
-        .from(markets)
-        .where(sql`LOWER(TRIM(${markets.name})) = LOWER(TRIM(${mName}))`)
-        .limit(1);
-      if (existing.length > 0) {
-        mId = existing[0].id;
-      } else {
-        const [newMarket] = await db
-          .insert(markets)
-          .values({ name: mName })
-          .returning();
-        mId = newMarket.id;
-      }
+      mId = await findOrCreateMarket(mName);
     }
 
     if (!mId) {
@@ -183,7 +171,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/receipts — listar notas fiscais
+// GET /api/receipts — listar notas fiscais com itens
 export async function GET() {
   try {
     const allReceipts = await db
@@ -200,7 +188,56 @@ export async function GET() {
       .orderBy(desc(receipts.date))
       .limit(50);
 
-    return NextResponse.json(allReceipts);
+    // Batch fetch all items for these receipts
+    const receiptIds = allReceipts.map((r) => r.id);
+    let itemsByReceipt: Record<number, Array<{
+      id: number;
+      productName: string;
+      productBrand: string | null;
+      quantity: string;
+      unitPrice: string;
+      totalPrice: string;
+    }>> = {};
+
+    if (receiptIds.length > 0) {
+      const allItems = await db
+        .select({
+          id: receiptItems.id,
+          receiptId: receiptItems.receiptId,
+          productName: products.name,
+          productBrand: products.brand,
+          quantity: receiptItems.quantity,
+          unitPrice: receiptItems.unitPrice,
+          totalPrice: receiptItems.totalPrice,
+        })
+        .from(receiptItems)
+        .innerJoin(products, eq(receiptItems.productId, products.id))
+        .where(
+          sql`${receiptItems.receiptId} IN (${sql.join(receiptIds.map(id => sql`${id}`), sql`, `)})`
+        )
+        .orderBy(receiptItems.id);
+
+      for (const item of allItems) {
+        if (!itemsByReceipt[item.receiptId]) {
+          itemsByReceipt[item.receiptId] = [];
+        }
+        itemsByReceipt[item.receiptId].push({
+          id: item.id,
+          productName: item.productName,
+          productBrand: item.productBrand,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        });
+      }
+    }
+
+    const enriched = allReceipts.map((receipt) => ({
+      ...receipt,
+      items: itemsByReceipt[receipt.id] || [],
+    }));
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error("Error fetching receipts:", error);
     return NextResponse.json(
