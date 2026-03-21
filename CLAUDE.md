@@ -41,15 +41,18 @@ Exemplos:
 src/
 ├── app/
 │   ├── api/
+│   │   ├── alerts/route.ts       # GET — deals matching needs
+│   │   ├── analytics/[productId]/route.ts # GET — price stats
 │   │   ├── dashboard/route.ts
+│   │   ├── mcp/route.ts          # MCP Server (OpenClaw tools)
 │   │   ├── needs/
 │   │   │   ├── route.ts          # GET, POST, PUT, DELETE
 │   │   │   └── [id]/route.ts     # GET by ID
 │   │   ├── prices/
-│   │   │   ├── route.ts          # GET, POST
+│   │   │   ├── route.ts          # GET, POST (+ match engine)
 │   │   │   └── history/[productId]/route.ts
 │   │   ├── products/route.ts     # GET
-│   │   ├── receipts/route.ts     # GET, POST
+│   │   ├── receipts/route.ts     # GET, POST (+ auto-create needs)
 │   │   └── shopping-list/route.ts # GET, POST, PATCH, DELETE
 │   ├── page.tsx                  # Dashboard
 │   ├── produtos/page.tsx
@@ -69,7 +72,10 @@ src/
 │   ├── index.ts                  # Lazy DB init via Proxy
 │   └── seed.ts                   # Seed 6 markets
 └── lib/
-    └── utils.ts                  # cn() helper
+    ├── match-engine.ts           # Fuzzy matching needs ↔ products (fuse.js)
+    ├── price-analytics.ts        # Price stats, trend, good deal detection
+    ├── utils.ts                  # cn() helper
+    └── validation.ts             # sanitize, positiveNumber, positiveInt
 ```
 
 ## Estrutura do banco (Drizzle schema)
@@ -125,12 +131,44 @@ Atacadão, Tenda Atacado, Assaí Atacadista, Arena Atacado, Morete Supermercados
 - `PUT /api/needs` — atualizar necessidade
 - `DELETE /api/needs?id=<id>` — soft delete (ou `&hard=true` pra deletar permanente)
 
+### Alertas e Analytics (inteligência)
+- `GET /api/alerts` — deals que fazem match com needs (`?market=`, `?needId=`, `?onlyDeals=true`)
+- `GET /api/analytics/[productId]` — stats de preço (média, mínimo, tendência, isGoodDeal)
+
 ### Consultas
 - `GET /api/products?search=<term>&category=<cat>&limit=50` — listar produtos com preços
 - `GET /api/prices` — preços recentes (7 dias)
 - `GET /api/prices/history/[productId]` — histórico de preços
 - `GET /api/dashboard` — stats e resumos
 - `GET /api/shopping-list` — lista de compras com melhor preço
+
+### MCP Server (para agentes AI)
+- `POST /api/mcp` — Endpoint MCP (Streamable HTTP) com tools:
+  - `register_promo_prices` — salvar preços de encartes
+  - `register_receipt` — salvar nota fiscal com itens
+  - `get_deals` — ver ofertas que fazem match com needs
+  - `get_best_price` — encontrar menor preço de um produto
+  - `check_market_promos` — promoções válidas de um mercado
+  - `get_price_analysis` — análise estatística de preço
+  - `manage_need` — criar/atualizar/desativar necessidades
+  - `search_products` — buscar produtos cadastrados
+
+## Match Engine (lib/match-engine.ts)
+
+- Usa **fuse.js** para fuzzy matching entre nomes de produtos e keywords das needs
+- Roda automaticamente quando um preço é inserido (POST /api/prices)
+- Roda automaticamente quando uma nota fiscal é processada (POST /api/receipts)
+- Re-roda para todos os produtos quando uma need é criada/atualizada
+- Popula a tabela `productNeeds` com score de confiança (0-1)
+- Threshold mínimo: 0.5 (50% de confiança)
+
+## Auto-create Needs (POST /api/receipts)
+
+- Quando uma nota fiscal é processada, para cada produto sem need correspondente:
+  - Cria need automaticamente com o nome da categoria/produto
+  - Define targetPrice = preço de compra atual
+  - alertMode = "below_target"
+  - Marca com nota "Criado automaticamente a partir de nota fiscal"
 
 ## Regras importantes
 
@@ -139,7 +177,46 @@ Atacadão, Tenda Atacado, Assaí Atacadista, Arena Atacado, Morete Supermercados
 - Keywords são **case-insensitive** pro match
 - O app é **mobile-first** (grids responsivos: 1 col mobile → 2-3 cols desktop)
 - Soft delete padrão para needs (toggle `active`), hard delete opcional
-- `productNeeds` existe no schema mas ainda não é usado nas rotas
+- `productNeeds` é populado automaticamente pelo match engine
+- Agente AI (OpenClaw) acessa via MCP Server em `/api/mcp`
+
+## Arquitetura do Ecossistema
+
+```
+┌──────────────────────────────────────────────────────┐
+│                    JULIUS APP                         │
+│  MCP Server (/api/mcp) ←─── OpenClaw (agente AI)    │
+│  Match Engine (fuse.js)      via Telegram/N8N        │
+│  Price Analytics (SQL)                                │
+│  REST API ←────────────────── Web Dashboard          │
+│  PostgreSQL (Neon)                                    │
+└──────────────────────────────────────────────────────┘
+
+Fluxo:
+1. WhatsApp recebe encartes → N8N → OpenClaw (Telegram)
+2. OpenClaw extrai produtos/preços via Vision AI
+3. OpenClaw chama Julius MCP tools para salvar dados
+4. Match engine conecta produtos ↔ necessidades do usuário
+5. CRON do OpenClaw chama get_deals para verificar alertas
+6. OpenClaw avisa no Telegram quando tem oferta boa
+7. Notas fiscais alimentam necessidades automaticamente
+```
+
+## Como conectar o OpenClaw ao MCP
+
+URL: `https://julius-ten.vercel.app/api/mcp` (ou `http://localhost:3000/api/mcp` local)
+Transport: Streamable HTTP (POST)
+Auth: Header `Authorization: Bearer <JULIUS_API_KEY>`
+
+## Environment Variables
+
+| Variável | Descrição |
+|----------|-----------|
+| `DATABASE_URL` | Connection string do Neon PostgreSQL |
+| `JULIUS_API_KEY` | API key para acesso do agente/programático |
+| `BETTER_AUTH_SECRET` | Secret do Better Auth (sessões) |
+| `BETTER_AUTH_URL` | URL base do app (ex: https://julius-ten.vercel.app) |
+| `NEXT_PUBLIC_APP_URL` | URL pública do app (usada pelo MCP server internamente) |
 
 ## Commands
 

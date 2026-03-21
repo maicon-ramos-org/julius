@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { needs } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
+import { rematchAllProducts } from "@/lib/match-engine";
 
 // GET /api/needs — listar necessidades
 export async function GET(req: NextRequest) {
@@ -49,6 +50,13 @@ export async function POST(req: NextRequest) {
       notes: body.notes?.trim() || null,
     }).returning();
 
+    // Re-match all products against the new need
+    try {
+      await rematchAllProducts();
+    } catch (matchErr) {
+      console.error("Re-match error (non-blocking):", matchErr);
+    }
+
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     console.error("Error creating need:", error);
@@ -85,6 +93,15 @@ export async function PUT(req: NextRequest) {
 
     if (!updated) {
       return NextResponse.json({ error: "Need not found" }, { status: 404 });
+    }
+
+    // Re-match if keywords or name changed
+    if (body.keywords !== undefined || body.name !== undefined) {
+      try {
+        await rematchAllProducts();
+      } catch (matchErr) {
+        console.error("Re-match error (non-blocking):", matchErr);
+      }
     }
 
     return NextResponse.json(updated);

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { prices, products, markets } from "@/db/schema";
 import { eq, desc, gte, and, sql, or, isNull } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
+import { matchAndPersist } from "@/lib/match-engine";
 
 // Calculate normalized price per base unit (kg, L, or un)
 function calcNormalized(
@@ -206,6 +207,20 @@ export async function POST(req: NextRequest) {
           promoValidUntil,
         })
         .returning();
+
+      // Run matching against active needs
+      try {
+        const productName = (await db
+          .select({ name: products.name })
+          .from(products)
+          .where(eq(products.id, pId))
+          .limit(1))[0]?.name;
+        if (productName) {
+          await matchAndPersist(pId, productName);
+        }
+      } catch (matchErr) {
+        console.error("Match engine error (non-blocking):", matchErr);
+      }
 
       results.push(inserted);
     }

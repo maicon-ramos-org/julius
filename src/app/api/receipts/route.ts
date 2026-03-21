@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { receipts, receiptItems, products, markets, prices } from "@/db/schema";
+import { receipts, receiptItems, products, markets, prices, needs } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
+import { matchAndPersist, matchProductToNeeds, getActiveNeeds } from "@/lib/match-engine";
 
 // POST /api/receipts — salvar nota fiscal processada
 export async function POST(req: NextRequest) {
@@ -125,6 +126,50 @@ export async function POST(req: NextRequest) {
           price: String(unitPrice),
           source: "receipt",
         });
+
+        // Run match engine for this product
+        const productName = pName || (await db
+          .select({ name: products.name })
+          .from(products)
+          .where(eq(products.id, pId))
+          .limit(1))[0]?.name;
+
+        if (productName) {
+          await matchAndPersist(pId, productName);
+
+          // Auto-create need if no matching need exists for this product's category
+          try {
+            const activeNeeds = await getActiveNeeds();
+            const matches = matchProductToNeeds(productName, activeNeeds);
+            if (matches.length === 0) {
+              const category = sanitize(item.category) || null;
+              const needName = category || productName;
+              // Check if a need with this name already exists
+              const [existingNeed] = await db
+                .select({ id: needs.id })
+                .from(needs)
+                .where(sql`LOWER(TRIM(${needs.name})) = LOWER(TRIM(${needName}))`)
+                .limit(1);
+
+              if (!existingNeed) {
+                const keywords = [needName.toLowerCase()];
+                if (category && category.toLowerCase() !== productName.toLowerCase()) {
+                  keywords.push(productName.toLowerCase());
+                }
+                await db.insert(needs).values({
+                  name: needName,
+                  category: category,
+                  keywords,
+                  targetPrice: String(unitPrice),
+                  alertMode: "below_target",
+                  notes: "Criado automaticamente a partir de nota fiscal",
+                });
+              }
+            }
+          } catch (autoNeedErr) {
+            console.error("Auto-create need error (non-blocking):", autoNeedErr);
+          }
+        }
       }
     }
 
