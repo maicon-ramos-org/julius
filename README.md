@@ -51,7 +51,7 @@ Acesse [http://localhost:3000](http://localhost:3000)
 ## Páginas
 
 | Rota | Descrição |
-|------|-----------|
+|------|-----------| 
 | `/` | Dashboard com gráficos de gastos e preços |
 | `/produtos` | Lista de produtos com melhor preço por mercado |
 | `/promocoes` | Feed de promoções dos últimos 7 dias |
