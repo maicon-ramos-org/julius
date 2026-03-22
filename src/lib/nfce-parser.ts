@@ -90,6 +90,12 @@ export function parseNfceHtml(html: string): Omit<NfceData, "accessKey" | "rawUr
     if (emiMatch) marketName = emiMatch[1].trim();
   }
 
+  // Fallback: "Razão Social: NAME"
+  if (!marketName) {
+    const razaoMatch = html.match(/Raz[aã]o\s*Social[^:]*:\s*([^<\n]+)/i);
+    if (razaoMatch) marketName = razaoMatch[1].trim();
+  }
+
   // CNPJ
   const cnpjMatch = html.match(/CNPJ[:\s]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i);
   if (cnpjMatch) marketCnpj = cnpjMatch[1].replace(/[.\/-]/g, "");
