@@ -1,0 +1,733 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-03-21T21:09:18.431Z",
+  "stack": {
+    "primaryLanguage": "typescript",
+    "languages": [
+      "javascript",
+      "typescript"
+    ],
+    "frameworks": [
+      "nextjs"
+    ],
+    "buildTools": [
+      "pnpm-workspace"
+    ],
+    "testFrameworks": [],
+    "packageManager": "pnpm",
+    "isMonorepo": true,
+    "hasDocker": false,
+    "hasCI": false,
+    "runtimeEnvironment": "browser"
+  },
+  "structure": {
+    "totalFiles": 67,
+    "rootPath": ".",
+    "topDirectories": [
+      {
+        "name": "public",
+        "fileCount": 5,
+        "description": "Public static assets"
+      },
+      {
+        "name": "src",
+        "fileCount": 49,
+        "description": "Source code root"
+      }
+    ],
+    "languageDistribution": [
+      {
+        "extension": ".ts",
+        "count": 26
+      },
+      {
+        "extension": ".tsx",
+        "count": 24
+      },
+      {
+        "extension": ".svg",
+        "count": 5
+      },
+      {
+        "extension": ".json",
+        "count": 3
+      },
+      {
+        "extension": ".md",
+        "count": 3
+      },
+      {
+        "extension": ".mjs",
+        "count": 2
+      },
+      {
+        "extension": ".yaml",
+        "count": 2
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      }
+    ]
+  },
+  "architecture": {
+    "layers": [
+      {
+        "name": "Utils",
+        "description": "Shared utilities and helpers",
+        "directories": [
+          "src/lib"
+        ],
+        "symbolCount": 16,
+        "dependsOn": []
+      },
+      {
+        "name": "Controllers",
+        "description": "Request handling and routing",
+        "directories": [
+          "src/app/api/shopping-list",
+          "src/app/api/receipts",
+          "src/app/api/products",
+          "src/app/api/prices",
+          "src/app/api/needs",
+          "src/app/api/mcp",
+          "src/app/api/dashboard",
+          "src/app/api/alerts",
+          "src/app/api/needs/[id]",
+          "src/app/api/auth/[...all]",
+          "src/app/api/analytics/[productId]",
+          "src/app/api/prices/history/[productId]"
+        ],
+        "symbolCount": 25,
+        "dependsOn": []
+      },
+      {
+        "name": "Components",
+        "description": "UI components and views",
+        "directories": [
+          "src/components",
+          "src/app",
+          "src/components/ui",
+          "src/app/promocoes",
+          "src/app/produtos",
+          "src/app/notas",
+          "src/app/necessidades",
+          "src/app/login",
+          "src/app/lista"
+        ],
+        "symbolCount": 28,
+        "dependsOn": []
+      }
+    ],
+    "patterns": [],
+    "entryPoints": [
+      "src/db/index.ts"
+    ],
+    "mainEntryPoints": [],
+    "moduleExports": [
+      "src/db/index.ts"
+    ]
+  },
+  "symbols": {
+    "classes": [],
+    "interfaces": [
+      {
+        "name": "ProductStats",
+        "kind": "interface",
+        "file": "src/lib/price-analytics.ts",
+        "line": 5,
+        "exported": true
+      },
+      {
+        "name": "DashboardData",
+        "kind": "interface",
+        "file": "src/app/page.tsx",
+        "line": 10,
+        "exported": false
+      },
+      {
+        "name": "DealInfo",
+        "kind": "interface",
+        "file": "src/app/api/alerts/route.ts",
+        "line": 7,
+        "exported": false
+      },
+      {
+        "name": "MatchResult",
+        "kind": "interface",
+        "file": "src/lib/match-engine.ts",
+        "line": 13,
+        "exported": false
+      },
+      {
+        "name": "Need",
+        "kind": "interface",
+        "file": "src/app/necessidades/page.tsx",
+        "line": 28,
+        "exported": false
+      },
+      {
+        "name": "NeedRecord",
+        "kind": "interface",
+        "file": "src/lib/match-engine.ts",
+        "line": 6,
+        "exported": false
+      },
+      {
+        "name": "Product",
+        "kind": "interface",
+        "file": "src/app/produtos/page.tsx",
+        "line": 9,
+        "exported": false
+      },
+      {
+        "name": "Promo",
+        "kind": "interface",
+        "file": "src/app/promocoes/page.tsx",
+        "line": 8,
+        "exported": false
+      },
+      {
+        "name": "ReceiptData",
+        "kind": "interface",
+        "file": "src/app/notas/page.tsx",
+        "line": 7,
+        "exported": false
+      },
+      {
+        "name": "ShoppingItem",
+        "kind": "interface",
+        "file": "src/app/lista/page.tsx",
+        "line": 9,
+        "exported": false
+      },
+      {
+        "name": "SpendingData",
+        "kind": "interface",
+        "file": "src/components/spending-chart.tsx",
+        "line": 6,
+        "exported": false
+      },
+      {
+        "name": "StatCardProps",
+        "kind": "interface",
+        "file": "src/components/stat-card.tsx",
+        "line": 4,
+        "exported": false
+      }
+    ],
+    "functions": [
+      {
+        "name": "cn",
+        "kind": "function",
+        "file": "src/lib/utils.ts",
+        "line": 4,
+        "exported": true
+      },
+      {
+        "name": "DELETE",
+        "kind": "function",
+        "file": "src/app/api/shopping-list/route.ts",
+        "line": 160,
+        "exported": true
+      },
+      {
+        "name": "DELETE",
+        "kind": "function",
+        "file": "src/app/api/needs/route.ts",
+        "line": 115,
+        "exported": true
+      },
+      {
+        "name": "DELETE",
+        "kind": "function",
+        "file": "src/app/api/mcp/route.ts",
+        "line": 521,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/shopping-list/route.ts",
+        "line": 8,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/receipts/route.ts",
+        "line": 187,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/products/route.ts",
+        "line": 7,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/prices/route.ts",
+        "line": 239,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/needs/route.ts",
+        "line": 8,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/mcp/route.ts",
+        "line": 517,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/dashboard/route.ts",
+        "line": 6,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/alerts/route.ts",
+        "line": 42,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/needs/[id]/route.ts",
+        "line": 7,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/analytics/[productId]/route.ts",
+        "line": 8,
+        "exported": true
+      },
+      {
+        "name": "GET",
+        "kind": "function",
+        "file": "src/app/api/prices/history/[productId]/route.ts",
+        "line": 6,
+        "exported": true
+      },
+      {
+        "name": "getActiveNeeds",
+        "kind": "function",
+        "file": "src/lib/match-engine.ts",
+        "line": 92,
+        "exported": true
+      },
+      {
+        "name": "getBestPrice",
+        "kind": "function",
+        "file": "src/lib/price-analytics.ts",
+        "line": 179,
+        "exported": true
+      },
+      {
+        "name": "getProductStats",
+        "kind": "function",
+        "file": "src/lib/price-analytics.ts",
+        "line": 23,
+        "exported": true
+      },
+      {
+        "name": "isGoodDeal",
+        "kind": "function",
+        "file": "src/lib/price-analytics.ts",
+        "line": 153,
+        "exported": true
+      },
+      {
+        "name": "LoginLayout",
+        "kind": "function",
+        "file": "src/app/login/layout.tsx",
+        "line": 3,
+        "exported": true
+      },
+      {
+        "name": "matchAndPersist",
+        "kind": "function",
+        "file": "src/lib/match-engine.ts",
+        "line": 108,
+        "exported": true
+      },
+      {
+        "name": "matchProductToNeeds",
+        "kind": "function",
+        "file": "src/lib/match-engine.ts",
+        "line": 23,
+        "exported": true
+      },
+      {
+        "name": "middleware",
+        "kind": "function",
+        "file": "src/middleware.ts",
+        "line": 5,
+        "exported": true
+      },
+      {
+        "name": "PATCH",
+        "kind": "function",
+        "file": "src/app/api/shopping-list/route.ts",
+        "line": 131,
+        "exported": true
+      },
+      {
+        "name": "positiveInt",
+        "kind": "function",
+        "file": "src/lib/validation.ts",
+        "line": 16,
+        "exported": true
+      },
+      {
+        "name": "positiveNumber",
+        "kind": "function",
+        "file": "src/lib/validation.ts",
+        "line": 8,
+        "exported": true
+      },
+      {
+        "name": "POST",
+        "kind": "function",
+        "file": "src/app/api/shopping-list/route.ts",
+        "line": 73,
+        "exported": true
+      },
+      {
+        "name": "POST",
+        "kind": "function",
+        "file": "src/app/api/receipts/route.ts",
+        "line": 9,
+        "exported": true
+      },
+      {
+        "name": "POST",
+        "kind": "function",
+        "file": "src/app/api/prices/route.ts",
+        "line": 51,
+        "exported": true
+      },
+      {
+        "name": "POST",
+        "kind": "function",
+        "file": "src/app/api/needs/route.ts",
+        "line": 30,
+        "exported": true
+      }
+    ],
+    "types": [],
+    "enums": []
+  },
+  "publicAPI": [
+    {
+      "name": "cn",
+      "kind": "function",
+      "file": "src/lib/utils.ts",
+      "line": 4,
+      "exported": true
+    },
+    {
+      "name": "DELETE",
+      "kind": "function",
+      "file": "src/app/api/shopping-list/route.ts",
+      "line": 160,
+      "exported": true
+    },
+    {
+      "name": "DELETE",
+      "kind": "function",
+      "file": "src/app/api/needs/route.ts",
+      "line": 115,
+      "exported": true
+    },
+    {
+      "name": "DELETE",
+      "kind": "function",
+      "file": "src/app/api/mcp/route.ts",
+      "line": 521,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/shopping-list/route.ts",
+      "line": 8,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/receipts/route.ts",
+      "line": 187,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/products/route.ts",
+      "line": 7,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/prices/route.ts",
+      "line": 239,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/needs/route.ts",
+      "line": 8,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/mcp/route.ts",
+      "line": 517,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/dashboard/route.ts",
+      "line": 6,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/alerts/route.ts",
+      "line": 42,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/needs/[id]/route.ts",
+      "line": 7,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/analytics/[productId]/route.ts",
+      "line": 8,
+      "exported": true
+    },
+    {
+      "name": "GET",
+      "kind": "function",
+      "file": "src/app/api/prices/history/[productId]/route.ts",
+      "line": 6,
+      "exported": true
+    },
+    {
+      "name": "getActiveNeeds",
+      "kind": "function",
+      "file": "src/lib/match-engine.ts",
+      "line": 92,
+      "exported": true
+    },
+    {
+      "name": "getBestPrice",
+      "kind": "function",
+      "file": "src/lib/price-analytics.ts",
+      "line": 179,
+      "exported": true
+    },
+    {
+      "name": "getProductStats",
+      "kind": "function",
+      "file": "src/lib/price-analytics.ts",
+      "line": 23,
+      "exported": true
+    },
+    {
+      "name": "isGoodDeal",
+      "kind": "function",
+      "file": "src/lib/price-analytics.ts",
+      "line": 153,
+      "exported": true
+    },
+    {
+      "name": "LoginLayout",
+      "kind": "function",
+      "file": "src/app/login/layout.tsx",
+      "line": 3,
+      "exported": true
+    },
+    {
+      "name": "matchAndPersist",
+      "kind": "function",
+      "file": "src/lib/match-engine.ts",
+      "line": 108,
+      "exported": true
+    },
+    {
+      "name": "matchProductToNeeds",
+      "kind": "function",
+      "file": "src/lib/match-engine.ts",
+      "line": 23,
+      "exported": true
+    },
+    {
+      "name": "middleware",
+      "kind": "function",
+      "file": "src/middleware.ts",
+      "line": 5,
+      "exported": true
+    },
+    {
+      "name": "PATCH",
+      "kind": "function",
+      "file": "src/app/api/shopping-list/route.ts",
+      "line": 131,
+      "exported": true
+    },
+    {
+      "name": "positiveInt",
+      "kind": "function",
+      "file": "src/lib/validation.ts",
+      "line": 16,
+      "exported": true
+    },
+    {
+      "name": "positiveNumber",
+      "kind": "function",
+      "file": "src/lib/validation.ts",
+      "line": 8,
+      "exported": true
+    },
+    {
+      "name": "POST",
+      "kind": "function",
+      "file": "src/app/api/shopping-list/route.ts",
+      "line": 73,
+      "exported": true
+    },
+    {
+      "name": "POST",
+      "kind": "function",
+      "file": "src/app/api/receipts/route.ts",
+      "line": 9,
+      "exported": true
+    },
+    {
+      "name": "POST",
+      "kind": "function",
+      "file": "src/app/api/prices/route.ts",
+      "line": 51,
+      "exported": true
+    },
+    {
+      "name": "POST",
+      "kind": "function",
+      "file": "src/app/api/needs/route.ts",
+      "line": 30,
+      "exported": true
+    }
+  ],
+  "dependencies": {
+    "mostImported": [
+      {
+        "file": "src/db/schema.ts",
+        "importedBy": 2
+      },
+      {
+        "file": ".next/types/routes.d.ts",
+        "importedBy": 1,
+        "description": "TypeScript type definitions"
+      },
+      {
+        "file": "src/db/auth-schema.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "src/app/globals.css",
+        "importedBy": 1,
+        "description": "Application entry (Next.js app router)"
+      }
+    ]
+  },
+  "stats": {
+    "totalSymbols": 75,
+    "exportedSymbols": 38,
+    "analysisTimeMs": 257
+  },
+  "keyFiles": [
+    {
+      "path": "src/db/index.ts",
+      "description": "Module exports",
+      "category": "entrypoint"
+    },
+    {
+      "path": "drizzle.config.ts",
+      "description": "Tool configuration",
+      "category": "config"
+    },
+    {
+      "path": "eslint.config.mjs",
+      "description": "Tool configuration",
+      "category": "config"
+    },
+    {
+      "path": "next.config.ts",
+      "description": "Tool configuration",
+      "category": "config"
+    },
+    {
+      "path": "package.json",
+      "description": "Package manifest",
+      "category": "config"
+    },
+    {
+      "path": "postcss.config.mjs",
+      "description": "Tool configuration",
+      "category": "config"
+    },
+    {
+      "path": "tsconfig.json",
+      "description": "TypeScript configuration",
+      "category": "config"
+    },
+    {
+      "path": "src/lib/utils.ts",
+      "description": "Utility functions",
+      "category": "util"
+    }
+  ],
+  "navigation": {
+    "tests": "src/**/*.test.ts",
+    "config": [
+      "package.json",
+      "tsconfig.json",
+      "next.config.ts"
+    ],
+    "types": [
+      "next-env.d.ts"
+    ],
+    "mainLogic": [
+      "src/lib"
+    ]
+  }
+}
