@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { receipts, receiptItems, products, markets, prices, needs } from "@/db/schema";
+import { receipts, receiptItems, products, markets, prices, needs, shoppingList } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 import { matchAndPersist, matchProductToNeeds, getActiveNeeds } from "@/lib/match-engine";
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
 
     // Inserir items
     const insertedItems = [];
+    let removedFromList = 0;
     if (items && Array.isArray(items)) {
       for (const item of items) {
         let pId = positiveInt(item.productId);
@@ -115,6 +116,17 @@ export async function POST(req: NextRequest) {
           source: "receipt",
         });
 
+        // Auto-remove from shopping list if product was purchased
+        try {
+          const deleted = await db
+            .delete(shoppingList)
+            .where(eq(shoppingList.productId, pId))
+            .returning({ id: shoppingList.id });
+          removedFromList += deleted.length;
+        } catch (listErr) {
+          console.error("Auto-remove from shopping list error (non-blocking):", listErr);
+        }
+
         // Run match engine for this product
         const productName = pName || (await db
           .select({ name: products.name })
@@ -161,7 +173,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, receipt, items: insertedItems });
+    return NextResponse.json({ success: true, receipt, items: insertedItems, removedFromList });
   } catch (error) {
     console.error("Error saving receipt:", error);
     return NextResponse.json(
