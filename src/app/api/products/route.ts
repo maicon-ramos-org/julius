@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { products, prices, markets } from "@/db/schema";
+import { products, prices, markets, receiptItems, shoppingList, productNeeds } from "@/db/schema";
 import { eq, desc, sql, and, gte } from "drizzle-orm";
+import { sanitize, positiveNumber } from "@/lib/validation";
 
 // GET /api/products — listar produtos com melhor preço (single query, no N+1)
 export async function GET(req: NextRequest) {
@@ -118,5 +119,112 @@ export async function GET(req: NextRequest) {
       { error: "Failed to fetch products" },
       { status: 500 }
     );
+  }
+}
+
+// POST /api/products — criar produto
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const name = sanitize(body.name);
+
+    if (!name) {
+      return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
+    }
+
+    // Check duplicate
+    const [existing] = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(sql`LOWER(TRIM(${products.name})) = LOWER(TRIM(${name}))`)
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json({ error: "Produto com esse nome já existe" }, { status: 409 });
+    }
+
+    const [created] = await db
+      .insert(products)
+      .values({
+        name,
+        brand: sanitize(body.brand) || null,
+        category: sanitize(body.category) || null,
+        unit: sanitize(body.unit) || null,
+        unitType: sanitize(body.unitType) || null,
+        unitQuantity: body.unitQuantity ? String(positiveNumber(body.unitQuantity)) : null,
+      })
+      .returning();
+
+    return NextResponse.json(created, { status: 201 });
+  } catch (error) {
+    console.error("Error creating product:", error);
+    return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
+  }
+}
+
+// PUT /api/products — atualizar produto
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    if (!body.id) {
+      return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (body.name !== undefined) updateData.name = sanitize(body.name);
+    if (body.brand !== undefined) updateData.brand = sanitize(body.brand) || null;
+    if (body.category !== undefined) updateData.category = sanitize(body.category) || null;
+    if (body.unit !== undefined) updateData.unit = sanitize(body.unit) || null;
+    if (body.unitType !== undefined) updateData.unitType = sanitize(body.unitType) || null;
+    if (body.unitQuantity !== undefined) {
+      updateData.unitQuantity = body.unitQuantity ? String(positiveNumber(body.unitQuantity)) : null;
+    }
+
+    const [updated] = await db
+      .update(products)
+      .set(updateData)
+      .where(eq(products.id, body.id))
+      .returning();
+
+    if (!updated) {
+      return NextResponse.json({ error: "Produto não encontrado" }, { status: 404 });
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("Error updating product:", error);
+    return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
+  }
+}
+
+// DELETE /api/products — deletar produto
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = parseInt(searchParams.get("id") || "");
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
+    }
+
+    // Check FK dependencies
+    const [hasPrice] = await db.select({ id: prices.id }).from(prices).where(eq(prices.productId, id)).limit(1);
+    const [hasReceiptItem] = await db.select({ id: receiptItems.id }).from(receiptItems).where(eq(receiptItems.productId, id)).limit(1);
+    const [hasShoppingItem] = await db.select({ id: shoppingList.id }).from(shoppingList).where(eq(shoppingList.productId, id)).limit(1);
+
+    if (hasPrice || hasReceiptItem || hasShoppingItem) {
+      return NextResponse.json(
+        { error: "Produto possui preços, notas ou itens de lista vinculados. Exclua-os primeiro." },
+        { status: 409 }
+      );
+    }
+
+    // Clean up productNeeds
+    await db.delete(productNeeds).where(eq(productNeeds.productId, id));
+    await db.delete(products).where(eq(products.id, id));
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }
 }

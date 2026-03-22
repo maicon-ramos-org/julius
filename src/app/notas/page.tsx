@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Receipt, Store, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Receipt, Store, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 
 interface ReceiptItem {
   id: number;
@@ -27,8 +28,9 @@ export default function NotasPage() {
   const [receipts, setReceipts] = useState<ReceiptData[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchReceipts = () => {
     fetch("/api/receipts")
       .then((r) => r.json())
       .then((data) => {
@@ -36,7 +38,17 @@ export default function NotasPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchReceipts();
   }, []);
+
+  const handleDelete = async (id: number) => {
+    await fetch(`/api/receipts?id=${id}`, { method: "DELETE" });
+    setDeleteConfirm(null);
+    fetchReceipts();
+  };
 
   const toggleExpanded = (id: number) => {
     setExpanded((prev) => {
@@ -96,7 +108,7 @@ export default function NotasPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <div className="text-right">
                           <p className="text-lg font-bold">
                             R$ {parseFloat(receipt.total).toFixed(2)}
@@ -112,6 +124,18 @@ export default function NotasPage() {
                             ? <ChevronUp size={18} className="text-gray-400" />
                             : <ChevronDown size={18} className="text-gray-400" />
                         )}
+                        <div onClick={(e) => e.stopPropagation()} className="ml-1">
+                          {deleteConfirm === receipt.id ? (
+                            <div className="flex items-center gap-1">
+                              <Button variant="destructive" size="xs" onClick={() => handleDelete(receipt.id)}>Sim</Button>
+                              <Button variant="ghost" size="xs" onClick={() => setDeleteConfirm(null)}>Não</Button>
+                            </div>
+                          ) : (
+                            <Button variant="ghost" size="icon-xs" onClick={() => setDeleteConfirm(receipt.id)}>
+                              <Trash2 size={14} />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </button>

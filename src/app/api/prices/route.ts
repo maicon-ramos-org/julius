@@ -277,3 +277,20 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+// DELETE /api/prices — deletar um registro de preço
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = parseInt(searchParams.get("id") || "");
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
+    }
+
+    await db.delete(prices).where(eq(prices.id, id));
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error deleting price:", error);
+    return NextResponse.json({ error: "Failed to delete price" }, { status: 500 });
+  }
+}

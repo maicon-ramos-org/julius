@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { markets, prices, products, receipts } from "@/db/schema";
 import { eq, sql, gte, and, desc } from "drizzle-orm";
+import { sanitize } from "@/lib/validation";
+import { normalizeText } from "@/lib/normalize";
 
 // GET /api/markets — list markets with stats
 export async function GET() {
@@ -100,5 +102,111 @@ export async function GET() {
       { error: "Failed to fetch markets" },
       { status: 500 }
     );
+  }
+}
+
+// POST /api/markets — criar mercado
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const name = sanitize(body.name);
+
+    if (!name) {
+      return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
+    }
+
+    // Check uniqueness (normalized)
+    const allMarkets = await db.select({ id: markets.id, name: markets.name }).from(markets);
+    const normalized = normalizeText(name);
+    const duplicate = allMarkets.find((m) => normalizeText(m.name) === normalized);
+    if (duplicate) {
+      return NextResponse.json(
+        { error: `Mercado "${duplicate.name}" já existe` },
+        { status: 409 }
+      );
+    }
+
+    const [created] = await db
+      .insert(markets)
+      .values({
+        name,
+        phone: sanitize(body.phone) || null,
+        loyaltyProgram: sanitize(body.loyaltyProgram) || null,
+        hasLoyalty: body.hasLoyalty === true,
+      })
+      .returning();
+
+    return NextResponse.json(created, { status: 201 });
+  } catch (error) {
+    console.error("Error creating market:", error);
+    return NextResponse.json({ error: "Failed to create market" }, { status: 500 });
+  }
+}
+
+// PUT /api/markets — atualizar mercado
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    if (!body.id) {
+      return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (body.name !== undefined) updateData.name = sanitize(body.name);
+    if (body.phone !== undefined) updateData.phone = sanitize(body.phone) || null;
+    if (body.loyaltyProgram !== undefined) updateData.loyaltyProgram = sanitize(body.loyaltyProgram) || null;
+    if (body.hasLoyalty !== undefined) updateData.hasLoyalty = body.hasLoyalty === true;
+
+    const [updated] = await db
+      .update(markets)
+      .set(updateData)
+      .where(eq(markets.id, body.id))
+      .returning();
+
+    if (!updated) {
+      return NextResponse.json({ error: "Mercado não encontrado" }, { status: 404 });
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("Error updating market:", error);
+    return NextResponse.json({ error: "Failed to update market" }, { status: 500 });
+  }
+}
+
+// DELETE /api/markets — deletar mercado
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = parseInt(searchParams.get("id") || "");
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
+    }
+
+    // Check FK dependencies
+    const [hasPrice] = await db
+      .select({ id: prices.id })
+      .from(prices)
+      .where(eq(prices.marketId, id))
+      .limit(1);
+
+    const [hasReceipt] = await db
+      .select({ id: receipts.id })
+      .from(receipts)
+      .where(eq(receipts.marketId, id))
+      .limit(1);
+
+    if (hasPrice || hasReceipt) {
+      return NextResponse.json(
+        { error: "Mercado possui preços ou notas vinculados. Exclua-os primeiro." },
+        { status: 409 }
+      );
+    }
+
+    await db.delete(markets).where(eq(markets.id, id));
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error deleting market:", error);
+    return NextResponse.json({ error: "Failed to delete market" }, { status: 500 });
   }
 }

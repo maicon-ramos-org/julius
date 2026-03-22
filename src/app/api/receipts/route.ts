@@ -246,3 +246,23 @@ export async function GET() {
     );
   }
 }
+
+// DELETE /api/receipts — deletar nota fiscal e seus itens
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = parseInt(searchParams.get("id") || "");
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
+    }
+
+    // Cascade: delete receipt items first
+    await db.delete(receiptItems).where(eq(receiptItems.receiptId, id));
+    await db.delete(receipts).where(eq(receipts.id, id));
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error deleting receipt:", error);
+    return NextResponse.json({ error: "Failed to delete receipt" }, { status: 500 });
+  }
+}
