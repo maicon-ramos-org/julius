@@ -5,6 +5,7 @@ import { eq, desc, gte, and, sql, or, isNull } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 import { matchAndPersist } from "@/lib/match-engine";
 import { findOrCreateMarket } from "@/lib/market-lookup";
+import { createInsertionLog } from "@/app/api/logs/route";
 
 // Calculate normalized price per base unit (kg, L, or un)
 function calcNormalized(
@@ -211,6 +212,39 @@ export async function POST(req: NextRequest) {
       }
 
       results.push(inserted);
+    }
+
+    // Create insertion log
+    const successfulInserts = results.filter(r => !r.error && !r._deduplicated);
+    if (successfulInserts.length > 0) {
+      const marketNames = [...new Set(items.map(item => item.marketName).filter(Boolean))];
+      const sources = [...new Set(items.map(item => item.source === "receipt" ? "receipt" : "promo"))];
+
+      const summary = `${successfulInserts.length} preço${successfulInserts.length > 1 ? 's' : ''} inserido${successfulInserts.length > 1 ? 's' : ''}${marketNames.length > 0 ? ` - ${marketNames.join(', ')}` : ''}`;
+
+      const firstPromoValidUntil = items.find(item => item.promoValidUntil)?.promoValidUntil;
+      let validUntil: Date | null = null;
+      if (firstPromoValidUntil) {
+        const d = new Date(firstPromoValidUntil);
+        if (!isNaN(d.getTime())) {
+          validUntil = d;
+        }
+      }
+
+      await createInsertionLog({
+        action: "price_insert",
+        source: sources.includes("receipt") ? "receipt_scan" : "promo_scan",
+        marketName: marketNames.length === 1 ? marketNames[0] : null,
+        summary,
+        details: {
+          insertedPrices: successfulInserts,
+          totalRequested: items.length,
+          duplicates: results.filter(r => r._deduplicated).length,
+          errors: results.filter(r => r.error).length,
+        },
+        itemCount: successfulInserts.length,
+        promoValidUntil: validUntil,
+      });
     }
 
     return NextResponse.json({ success: true, data: results });

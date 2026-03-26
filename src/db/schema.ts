@@ -83,3 +83,16 @@ export const shoppingList = pgTable("shopping_list", {
   checked: boolean("checked").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Logs de inserções para rastrear atividades de entrada de dados
+export const insertionLogs = pgTable("insertion_logs", {
+  id: serial("id").primaryKey(),
+  action: varchar("action", { length: 50 }).notNull(), // 'price_insert', 'receipt_insert', 'product_create', etc
+  source: varchar("source", { length: 30 }).notNull(), // 'api', 'manual', 'promo_scan', 'receipt_scan'
+  marketName: varchar("market_name", { length: 255 }), // nome do mercado (quando aplicável)
+  summary: text("summary").notNull(), // resumo legível da operação
+  details: jsonb("details"), // detalhes completos da operação
+  itemCount: integer("item_count").default(0).notNull(), // quantidade de itens inseridos
+  promoValidUntil: timestamp("promo_valid_until"), // validade da promoção (quando aplicável)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

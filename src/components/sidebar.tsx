@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Target,
   Store,
+  FileText,
   Menu,
   X,
   LogOut,
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/lista", label: "Lista de Compras", icon: ShoppingCart },
   { href: "/mercados", label: "Mercados", icon: Store },
   { href: "/necessidades", label: "Necessidades", icon: Target },
+  { href: "/logs", label: "Logs", icon: FileText },
 ];
 
 export function Sidebar() {

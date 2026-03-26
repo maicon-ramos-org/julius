@@ -5,6 +5,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 import { matchAndPersist, matchProductToNeeds, getActiveNeeds } from "@/lib/match-engine";
 import { findOrCreateMarket } from "@/lib/market-lookup";
+import { createInsertionLog } from "@/app/api/logs/route";
 
 // POST /api/receipts — salvar nota fiscal processada
 export async function POST(req: NextRequest) {
@@ -171,6 +172,32 @@ export async function POST(req: NextRequest) {
           }
         }
       }
+    }
+
+    // Create insertion log
+    if (insertedItems.length > 0) {
+      const marketName = (await db
+        .select({ name: markets.name })
+        .from(markets)
+        .where(eq(markets.id, mId))
+        .limit(1))[0]?.name;
+
+      const summary = `Nota fiscal processada - ${insertedItems.length} item${insertedItems.length > 1 ? 'ns' : ''} (R$ ${validTotal.toFixed(2)})${marketName ? ` - ${marketName}` : ''}`;
+
+      await createInsertionLog({
+        action: "receipt_insert",
+        source: "receipt_scan",
+        marketName: marketName || null,
+        summary,
+        details: {
+          receiptId: receipt.id,
+          total: validTotal,
+          date: validDate,
+          items: insertedItems,
+          removedFromShoppingList: removedFromList,
+        },
+        itemCount: insertedItems.length,
+      });
     }
 
     return NextResponse.json({ success: true, receipt, items: insertedItems, removedFromList });
