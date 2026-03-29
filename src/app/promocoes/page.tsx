@@ -14,6 +14,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Tag, Clock, CreditCard, Plus, Trash2 } from "lucide-react";
+import { MarketBadge } from "@/components/MarketBadge";
 
 interface Promo {
   id: number;
@@ -29,6 +30,7 @@ interface Promo {
   productCategory: string | null;
   productUnit: string | null;
   marketName: string;
+  marketLogoUrl: string | null;
 }
 
 interface MarketOption {
@@ -225,7 +227,10 @@ export default function PromocoesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                      <span>📍 {promo.marketName}</span>
+                      <div className="flex items-center gap-1.5">
+                        <MarketBadge name={promo.marketName} logoUrl={promo.marketLogoUrl} size="sm" />
+                        <span>{promo.marketName}</span>
+                      </div>
                       <span className="flex items-center gap-1">
                         <Clock size={12} />
                         {formatDate(promo.createdAt)}

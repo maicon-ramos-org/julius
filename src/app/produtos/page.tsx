@@ -14,6 +14,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Search, TrendingDown, Plus, Pencil, Trash2 } from "lucide-react";
+import { MarketBadge } from "@/components/MarketBadge";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, Cell,
@@ -30,6 +31,7 @@ interface Product {
   bestPrice: {
     price: string;
     marketName: string | null;
+    marketLogoUrl: string | null;
     source: string | null;
   } | null;
 }
@@ -38,6 +40,7 @@ interface PriceHistoryEntry {
   price: string;
   createdAt: string;
   marketName: string;
+  marketLogoUrl: string | null;
   marketId: number;
   source: string;
   priceType: string;
@@ -295,13 +298,22 @@ export default function ProdutosPage() {
               </CardHeader>
               <CardContent>
                 {product.bestPrice ? (
-                  <div className="flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4 text-green-600" />
-                    <span className="text-lg font-bold text-green-600">
-                      R$ {parseFloat(product.bestPrice.price).toFixed(2)}
-                    </span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4 text-green-600" />
+                      <span className="text-lg font-bold text-green-600">
+                        R$ {parseFloat(product.bestPrice.price).toFixed(2)}
+                      </span>
+                    </div>
                     {product.bestPrice.marketName && (
-                      <span className="text-xs text-gray-500">@ {product.bestPrice.marketName}</span>
+                      <div className="flex items-center gap-1.5">
+                        <MarketBadge
+                          name={product.bestPrice.marketName}
+                          logoUrl={product.bestPrice.marketLogoUrl}
+                          size="sm"
+                        />
+                        <span className="text-xs text-gray-500">{product.bestPrice.marketName}</span>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -429,6 +441,7 @@ export default function ProdutosPage() {
                   {history.slice(0, 15).map((h, i) => (
                     <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
                       <div className="flex items-center gap-2">
+                        <MarketBadge name={h.marketName} logoUrl={h.marketLogoUrl} size="sm" />
                         <span className="font-medium">{h.marketName}</span>
                         <Badge variant={h.source === "promo" ? "default" : "secondary"} className="text-xs">
                           {h.source === "promo" ? "encarte" : "nota"}

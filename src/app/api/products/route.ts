@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       .filter((p) => p.bestPrice !== null)
       .map((p) => p.id);
 
-    let priceMarketMap: Record<number, { marketName: string; source: string }> = {};
+    let priceMarketMap: Record<number, { marketName: string; marketLogoUrl: string | null; source: string }> = {};
 
     if (productIds.length > 0) {
       const priceDetails = await db
@@ -71,6 +71,7 @@ export async function GET(req: NextRequest) {
           productId: prices.productId,
           price: prices.price,
           marketName: markets.name,
+          marketLogoUrl: markets.logoUrl,
           source: prices.source,
         })
         .from(prices)
@@ -88,6 +89,7 @@ export async function GET(req: NextRequest) {
         if (!priceMarketMap[pd.productId]) {
           priceMarketMap[pd.productId] = {
             marketName: pd.marketName,
+            marketLogoUrl: pd.marketLogoUrl,
             source: pd.source,
           };
         }
@@ -107,6 +109,7 @@ export async function GET(req: NextRequest) {
         ? {
             price: product.bestPrice,
             marketName: priceMarketMap[product.id]?.marketName || null,
+            marketLogoUrl: priceMarketMap[product.id]?.marketLogoUrl || null,
             source: priceMarketMap[product.id]?.source || null,
           }
         : null,

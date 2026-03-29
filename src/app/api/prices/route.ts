@@ -294,6 +294,7 @@ export async function GET(req: NextRequest) {
         productCategory: products.category,
         productUnit: products.unit,
         marketName: markets.name,
+        marketLogoUrl: markets.logoUrl,
       })
       .from(prices)
       .innerJoin(products, eq(prices.productId, products.id))

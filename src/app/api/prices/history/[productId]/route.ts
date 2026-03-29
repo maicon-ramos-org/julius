@@ -34,6 +34,7 @@ export async function GET(
         promoValidUntil: prices.promoValidUntil,
         createdAt: prices.createdAt,
         marketName: markets.name,
+        marketLogoUrl: markets.logoUrl,
         marketId: markets.id,
       })
       .from(prices)
