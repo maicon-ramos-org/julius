@@ -510,7 +510,7 @@ function createServer() {
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ url, autoRegister }) => {
+    async ({ url, autoRegister }: { url: string; autoRegister?: boolean }) => {
       try {
         const nfce = await fetchAndParseNfce(url);
 

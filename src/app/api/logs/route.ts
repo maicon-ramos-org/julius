@@ -147,10 +147,10 @@ export async function POST(req: NextRequest) {
     const [log] = await db
       .insert(insertionLogs)
       .values({
-        action: sanitize(action),
-        source: sanitize(source),
+        action: (sanitize(action) ?? action) as string,
+        source: (sanitize(source) ?? source) as string,
         marketName: sanitize(marketName) || null,
-        summary: sanitize(summary),
+        summary: (sanitize(summary) ?? summary) as string,
         details: details ? JSON.stringify(details) : null,
         itemCount: positiveInt(itemCount) || 0,
         promoValidUntil: validPromoUntil,

@@ -64,7 +64,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const results = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results: Array<Record<string, any>> = [];
     for (const item of items) {
       const price = positiveNumber(item.price);
       const source = item.source === "receipt" ? "receipt" : "promo";
