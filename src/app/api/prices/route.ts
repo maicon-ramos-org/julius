@@ -135,11 +135,22 @@ export async function POST(req: NextRequest) {
       }
 
       let promoValidUntil: Date | null = null;
-      if (item.promoValidUntil) {
+
+      // Priority: promoEnd > promoValidUntil > auto-calculate from promoStart or source
+      if (item.promoEnd) {
+        const d = new Date(item.promoEnd);
+        if (!isNaN(d.getTime())) {
+          promoValidUntil = d;
+        }
+      } else if (item.promoValidUntil) {
         const d = new Date(item.promoValidUntil);
         if (!isNaN(d.getTime())) {
           promoValidUntil = d;
         }
+      } else if (source === "promo") {
+        // Auto-set to 7 days from now if no explicit end date for promos
+        promoValidUntil = new Date();
+        promoValidUntil.setDate(promoValidUntil.getDate() + 7);
       }
 
       // Dedup: check if same (productId, marketId, price, priceType) exists in last 24h
