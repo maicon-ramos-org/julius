@@ -22,6 +22,7 @@ interface MarketData {
   phone: string | null;
   hasLoyalty: boolean;
   loyaltyProgram: string | null;
+  logoUrl: string | null;
   stats: {
     productsTracked: number;
     recentPromos7d: number;
@@ -35,6 +36,7 @@ const emptyForm = {
   phone: "",
   loyaltyProgram: "",
   hasLoyalty: false,
+  logoUrl: "",
 };
 
 export default function MercadosPage() {
@@ -46,6 +48,7 @@ export default function MercadosPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const fetchMarkets = () => {
     fetch("/api/markets")
@@ -75,6 +78,7 @@ export default function MercadosPage() {
       phone: market.phone || "",
       loyaltyProgram: market.loyaltyProgram || "",
       hasLoyalty: market.hasLoyalty,
+      logoUrl: market.logoUrl || "",
     });
     setError(null);
     setDialogOpen(true);
@@ -91,6 +95,7 @@ export default function MercadosPage() {
       phone: form.phone.trim() || null,
       loyaltyProgram: form.loyaltyProgram.trim() || null,
       hasLoyalty: form.hasLoyalty,
+      logoUrl: form.logoUrl.trim() || null,
     };
 
     try {
@@ -131,6 +136,75 @@ export default function MercadosPage() {
     fetchMarkets();
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const { url } = await res.json();
+        setForm({ ...form, logoUrl: url });
+      } else {
+        const data = await res.json();
+        setError(data.error || "Erro no upload");
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Erro de conexão no upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Generate color from name hash
+  const getColorFromName = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 65%, 50%)`;
+  };
+
+  // Market Logo Component
+  const MarketLogo = ({ name, logoUrl }: { name: string; logoUrl?: string | null }) => {
+    if (logoUrl) {
+      return (
+        <img
+          src={logoUrl}
+          alt={`Logo ${name}`}
+          className="h-12 w-12 rounded-full object-cover"
+        />
+      );
+    }
+
+    const initials = name
+      .split(" ")
+      .slice(0, 2)
+      .map(word => word[0]?.toUpperCase())
+      .join("");
+
+    return (
+      <div
+        className="h-12 w-12 rounded-full flex items-center justify-center text-white font-semibold"
+        style={{ backgroundColor: getColorFromName(name) }}
+      >
+        {initials}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -162,9 +236,7 @@ export default function MercadosPage() {
             <Card key={market.id} className="hover:shadow-md transition-shadow">
               <CardContent className="py-5">
                 <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
-                    <Store className="h-6 w-6 text-green-600" />
-                  </div>
+                  <MarketLogo name={market.name} logoUrl={market.logoUrl} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -276,6 +348,34 @@ export default function MercadosPage() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-700">Logo</label>
+              <div className="space-y-3">
+                {form.logoUrl && (
+                  <div className="flex items-center gap-3">
+                    <img src={form.logoUrl} alt="Preview" className="h-10 w-10 rounded-full object-cover" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setForm({ ...form, logoUrl: "" })}
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                )}
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+                {uploading && (
+                  <p className="text-xs text-gray-500">Fazendo upload...</p>
+                )}
+              </div>
             </div>
 
             <div>

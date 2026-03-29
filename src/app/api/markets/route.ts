@@ -87,6 +87,7 @@ export async function GET() {
       phone: market.phone,
       hasLoyalty: market.hasLoyalty,
       loyaltyProgram: market.loyaltyProgram,
+      logoUrl: market.logoUrl,
       stats: {
         productsTracked: productMap[market.id] || 0,
         recentPromos7d: promoMap[market.id] || 0,
@@ -133,6 +134,7 @@ export async function POST(req: NextRequest) {
         phone: sanitize(body.phone) || null,
         loyaltyProgram: sanitize(body.loyaltyProgram) || null,
         hasLoyalty: body.hasLoyalty === true,
+        logoUrl: sanitize(body.logoUrl) || null,
       })
       .returning();
 
@@ -156,6 +158,7 @@ export async function PUT(req: NextRequest) {
     if (body.phone !== undefined) updateData.phone = sanitize(body.phone) || null;
     if (body.loyaltyProgram !== undefined) updateData.loyaltyProgram = sanitize(body.loyaltyProgram) || null;
     if (body.hasLoyalty !== undefined) updateData.hasLoyalty = body.hasLoyalty === true;
+    if (body.logoUrl !== undefined) updateData.logoUrl = sanitize(body.logoUrl) || null;
 
     const [updated] = await db
       .update(markets)

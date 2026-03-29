@@ -8,6 +8,13 @@
       "when": 1774523338625,
       "tag": "0000_perpetual_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774750818839,
+      "tag": "0001_previous_captain_stacy",
+      "breakpoints": true
     }
   ]
 }

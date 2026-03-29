@@ -6,6 +6,7 @@ export const markets = pgTable("markets", {
   phone: varchar("phone", { length: 20 }),
   loyaltyProgram: varchar("loyalty_program", { length: 255 }),
   hasLoyalty: boolean("has_loyalty").default(false).notNull(),
+  logoUrl: text("logo_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

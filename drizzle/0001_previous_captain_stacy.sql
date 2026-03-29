@@ -1,0 +1,1 @@
+ALTER TABLE "markets" ADD COLUMN "logo_url" text;
