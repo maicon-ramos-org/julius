@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { MarketBadge } from "@/components/MarketBadge";
-import { Flame, Tag, Clock, Filter } from "lucide-react";
+import { Flame, Tag, Clock, Filter, Star } from "lucide-react";
 
 interface Offer {
   id: number;
@@ -21,6 +20,13 @@ interface Offer {
   createdAt: string;
 }
 
+interface Need {
+  id: number;
+  name: string;
+  category: string | null;
+  priority: string | null;
+}
+
 interface MarketOption {
   id: number;
   name: string;
@@ -29,6 +35,7 @@ interface MarketOption {
 
 export default function OfertasPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [needs, setNeeds] = useState<Need[]>([]);
   const [markets, setMarkets] = useState<MarketOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [marketFilter, setMarketFilter] = useState<string>("");
@@ -48,6 +55,16 @@ export default function OfertasPage() {
       .finally(() => setLoading(false));
   };
 
+  const fetchNeeds = () => {
+    fetch("/api/needs?active=true")
+      .then((r) => r.json())
+      .then((data) => {
+        const needsList: Need[] = Array.isArray(data) ? data : data.needs || [];
+        setNeeds(needsList);
+      })
+      .catch(console.error);
+  };
+
   const fetchMarkets = () => {
     fetch("/api/markets")
       .then((r) => r.json())
@@ -65,19 +82,41 @@ export default function OfertasPage() {
 
   useEffect(() => {
     fetchOffers();
+    fetchNeeds();
+    fetchMarkets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marketFilter]);
 
-  useEffect(() => {
-    fetchMarkets();
-  }, []);
+  // Match each offer against user needs
+  const getMatchedNeed = (offer: Offer): Need | null => {
+    if (needs.length === 0) return null;
+    const offerName = offer.productName.toLowerCase();
+    const offerCategory = (offer.productCategory || "").toLowerCase();
+
+    for (const need of needs) {
+      const needName = need.name.toLowerCase();
+      const needCategory = (need.category || "").toLowerCase();
+      // Name fuzzy match
+      if (
+        offerName.includes(needName) ||
+        needName.includes(offerName.split(" ").slice(0, 3).join(" "))
+      ) {
+        return need;
+      }
+      // Category match
+      if (needCategory && offerCategory && needCategory === offerCategory) {
+        return need;
+      }
+    }
+    return null;
+  };
 
   const getDaysUntilExpiry = (validUntil: string | null) => {
     if (!validUntil) return null;
     const now = new Date();
     const expiry = new Date(validUntil);
     const diffTime = expiry.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   const getExpiryColor = (days: number | null) => {
@@ -95,22 +134,110 @@ export default function OfertasPage() {
     return `Expira em ${days}d`;
   };
 
-  // Split offers: best deals are urgent (< 7 days) + high value items
-  const bestOffers = offers.filter((offer) => {
+  // Classify offers
+  const needMatches = offers.filter((o) => getMatchedNeed(o) !== null);
+  const urgent = (offer: Offer) => {
     const days = getDaysUntilExpiry(offer.promoValidUntil);
-    const isUrgent = days !== null && days < 7;
-    const isHighValue = parseFloat(offer.price) >= 10; // Arbitrary threshold
-    return isUrgent || isHighValue;
-  }).slice(0, 8);
+    return days !== null && days < 7;
+  };
+  const bestOffers = offers
+    .filter((o) => urgent(o) || parseFloat(o.price) >= 10)
+    .slice(0, 8);
+  const regularOffers = offers;
 
-  const regularOffers = offers.filter((offer) => !bestOffers.includes(offer));
+  const renderCard = (offer: Offer, size: "sm" | "md") => {
+    const days = getDaysUntilExpiry(offer.promoValidUntil);
+    const expiryColor = getExpiryColor(days);
+    const expiryText = getExpiryText(days);
+    const matched = getMatchedNeed(offer);
+    const isMatched = matched !== null;
+
+    return (
+      <Card
+        key={offer.id}
+        className={`hover:shadow-md transition-shadow ${isMatched ? "ring-2 ring-green-400" : ""}`}
+      >
+        <CardContent className="p-4">
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              {size === "md" && (
+                <MarketBadge name={offer.marketName} logoUrl={offer.marketLogoUrl} size="md" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-1">
+                  <h3 className="font-medium text-sm leading-tight">{offer.productName}</h3>
+                  {offer.productBrand && (
+                    <Badge variant="outline" className="text-xs ml-1 flex-shrink-0">
+                      {offer.productBrand}
+                    </Badge>
+                  )}
+                </div>
+                {size === "sm" && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <MarketBadge name={offer.marketName} logoUrl={offer.marketLogoUrl} size="sm" />
+                    <span className="text-xs text-gray-500 truncate">{offer.marketName}</span>
+                  </div>
+                )}
+                {size === "md" && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {offer.productCategory && (
+                      <Badge variant="secondary" className="text-xs">
+                        {offer.productCategory}
+                      </Badge>
+                    )}
+                    {isMatched && (
+                      <Badge className="text-xs bg-green-600 hover:bg-green-700">
+                        🎯 Na sua lista
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xl font-bold text-green-600">
+                R$ {parseFloat(offer.price).toFixed(2)}
+              </span>
+              <div className="flex items-center gap-2">
+                {offer.priceType === "loyalty" && (
+                  <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
+                    Cartão
+                  </Badge>
+                )}
+                {offer.promoValidUntil && (
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    expiryColor === "red"
+                      ? "bg-red-100 text-red-700"
+                      : expiryColor === "yellow"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-green-100 text-green-700"
+                  }`}>
+                    {expiryText}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {size === "sm" && isMatched && (
+              <div className="text-xs text-green-600 font-medium">🎯 Na sua lista</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ofertas</h1>
-          <p className="text-gray-500">Promoções válidas por mercado</p>
+          <p className="text-gray-500">
+            {needs.length > 0
+              ? `${needs.length} itens na sua lista de necessidades`
+              : "Promoções válidas por mercado"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-gray-400" />
@@ -135,6 +262,22 @@ export default function OfertasPage() {
         </div>
       ) : (
         <>
+          {/* 🎯 Ofertas que Você Precisa */}
+          {needMatches.length > 0 && (
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg border border-green-200">
+              <div className="flex items-center gap-2 mb-4">
+                <Star className="h-5 w-5 text-green-600" />
+                <h2 className="text-lg font-bold text-green-900">🎯 Ofertas que Você Precisa</h2>
+                <Badge variant="outline" className="border-green-300 text-green-700">
+                  {needMatches.length} item{needMatches.length > 1 ? "s" : ""}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {needMatches.map((offer) => renderCard(offer, "sm"))}
+              </div>
+            </div>
+          )}
+
           {/* ⭐ Melhores Ofertas */}
           {bestOffers.length > 0 && (
             <div className="bg-gradient-to-r from-orange-50 to-red-50 p-6 rounded-lg border border-orange-200">
@@ -146,56 +289,7 @@ export default function OfertasPage() {
                 </Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {bestOffers.map((offer) => {
-                  const days = getDaysUntilExpiry(offer.promoValidUntil);
-                  const expiryColor = getExpiryColor(days);
-                  const expiryText = getExpiryText(days);
-
-                  return (
-                    <Card key={offer.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="space-y-2">
-                          <div className="flex items-start justify-between">
-                            <h3 className="font-medium text-sm leading-tight">{offer.productName}</h3>
-                            {offer.productBrand && (
-                              <Badge variant="outline" className="text-xs ml-1 flex-shrink-0">
-                                {offer.productBrand}
-                              </Badge>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <MarketBadge
-                              name={offer.marketName}
-                              logoUrl={offer.marketLogoUrl}
-                              size="sm"
-                            />
-                            <span className="text-xs text-gray-600 truncate">
-                              {offer.marketName}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-green-600">
-                              R$ {parseFloat(offer.price).toFixed(2)}
-                            </span>
-                            {offer.promoValidUntil && (
-                              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                expiryColor === "red"
-                                  ? "bg-red-100 text-red-700"
-                                  : expiryColor === "yellow"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-green-100 text-green-700"
-                              }`}>
-                                {expiryText}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                {bestOffers.map((offer) => renderCard(offer, "sm"))}
               </div>
             </div>
           )}
@@ -208,6 +302,11 @@ export default function OfertasPage() {
               <Badge variant="secondary">
                 {offers.length} produto{offers.length > 1 ? "s" : ""}
               </Badge>
+              {needMatches.length > 0 && (
+                <Badge variant="outline" className="border-green-300 text-green-700">
+                  {needMatches.length} na sua lista
+                </Badge>
+              )}
             </div>
 
             {offers.length === 0 ? (
@@ -217,76 +316,13 @@ export default function OfertasPage() {
                   <p className="text-gray-500">
                     {marketFilter
                       ? `Nenhuma oferta encontrada em ${marketFilter}.`
-                      : "Nenhuma oferta válida encontrada."
-                    }
+                      : "Nenhuma oferta válida encontrada."}
                   </p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {(bestOffers.length > 0 ? regularOffers : offers).map((offer) => {
-                  const days = getDaysUntilExpiry(offer.promoValidUntil);
-                  const expiryColor = getExpiryColor(days);
-                  const expiryText = getExpiryText(days);
-
-                  return (
-                    <Card key={offer.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex items-start gap-2">
-                            <MarketBadge
-                              name={offer.marketName}
-                              logoUrl={offer.marketLogoUrl}
-                              size="md"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-medium leading-tight">{offer.productName}</h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                {offer.productBrand && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {offer.productBrand}
-                                  </Badge>
-                                )}
-                                {offer.productCategory && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {offer.productCategory}
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-gray-500 mt-1">{offer.marketName}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className="text-xl font-bold text-green-600">
-                              R$ {parseFloat(offer.price).toFixed(2)}
-                            </span>
-                            {offer.priceType === "loyalty" && (
-                              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">
-                                Cartão
-                              </Badge>
-                            )}
-                          </div>
-
-                          {offer.promoValidUntil && (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Clock className="h-3 w-3 text-gray-400" />
-                              <span className={`font-medium ${
-                                expiryColor === "red"
-                                  ? "text-red-600"
-                                  : expiryColor === "yellow"
-                                  ? "text-yellow-600"
-                                  : "text-green-600"
-                              }`}>
-                                {expiryText}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                {regularOffers.map((offer) => renderCard(offer, "md"))}
               </div>
             )}
           </div>
