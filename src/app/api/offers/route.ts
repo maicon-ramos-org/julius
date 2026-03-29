@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { prices, products, markets } from "@/db/schema";
-import { eq, desc, gte, and, sql, or, isNull } from "drizzle-orm";
+import { eq, desc, gte, and, sql } from "drizzle-orm";
 
 // GET /api/offers — promoções válidas com critério de validade
 export async function GET(req: NextRequest) {
@@ -11,24 +11,16 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get("category");
 
     const now = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     // Build conditions
     const conditions = [
       // Only promo source
       eq(prices.source, "promo"),
-      // Valid promos: either has valid_until in future OR null and created within 7 days
-      or(
-        and(
-          sql`${prices.promoValidUntil} IS NOT NULL`,
-          gte(prices.promoValidUntil, now)
-        ),
-        and(
-          isNull(prices.promoValidUntil),
-          gte(prices.createdAt, sevenDaysAgo)
-        )
-      ),
+      // ONLY promos with explicit future validity date (from encarte)
+      and(
+        sql`${prices.promoValidUntil} IS NOT NULL`,
+        gte(prices.promoValidUntil, now)
+      ) as ReturnType<typeof eq>,
     ];
 
     if (market) {
