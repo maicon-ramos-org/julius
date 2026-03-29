@@ -23,6 +23,7 @@ import {
   Bell,
   BellOff,
   BellRing,
+  Bot,
 } from "lucide-react";
 
 interface Need {
@@ -258,6 +259,15 @@ export default function NecessidadesPage() {
                           <AlertIcon size={10} />
                           {ALERT_LABELS[need.alertMode] || need.alertMode}
                         </Badge>
+                        {need.notes === "Criado automaticamente a partir de nota fiscal" && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs gap-1 border-blue-300 text-blue-700 bg-blue-50"
+                          >
+                            <Bot size={10} />
+                            Auto
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-2 shrink-0">

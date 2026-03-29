@@ -6,6 +6,7 @@ import { sanitize, positiveNumber, positiveInt } from "@/lib/validation";
 import { matchAndPersist, matchProductToNeeds, getActiveNeeds } from "@/lib/match-engine";
 import { findOrCreateMarket } from "@/lib/market-lookup";
 import { createInsertionLog } from "@/app/api/logs/route";
+import { inferGenericName, generateKeywords } from "@/lib/infer-generic-name";
 
 // POST /api/receipts — salvar nota fiscal processada
 export async function POST(req: NextRequest) {
@@ -138,33 +139,39 @@ export async function POST(req: NextRequest) {
         if (productName) {
           await matchAndPersist(pId, productName);
 
-          // Auto-create need if no matching need exists for this product's category
+          // Auto-infer need if no matching need exists for this product
           try {
             const activeNeeds = await getActiveNeeds();
             const matches = matchProductToNeeds(productName, activeNeeds);
+
             if (matches.length === 0) {
-              const category = sanitize(item.category) || null;
-              const needName = category || productName;
-              // Check if a need with this name already exists
+              // Infer generic category name from product name
+              const genericName = inferGenericName(productName);
+
+              // Check if a need with this generic name already exists
               const [existingNeed] = await db
                 .select({ id: needs.id })
                 .from(needs)
-                .where(sql`LOWER(TRIM(${needs.name})) = LOWER(TRIM(${needName}))`)
+                .where(sql`LOWER(TRIM(${needs.name})) = LOWER(TRIM(${genericName}))`)
                 .limit(1);
 
               if (!existingNeed) {
-                const keywords = [needName.toLowerCase()];
-                if (category && category.toLowerCase() !== productName.toLowerCase()) {
-                  keywords.push(productName.toLowerCase());
-                }
+                // Generate keywords for better matching
+                const keywords = generateKeywords(genericName);
+
+                // Set target price to 5% below current purchase price
+                const targetPrice = unitPrice * 0.95;
+
                 await db.insert(needs).values({
-                  name: needName,
-                  category: category,
+                  name: genericName,
+                  category: sanitize(item.category) || null,
                   keywords,
-                  targetPrice: String(unitPrice),
+                  targetPrice: String(targetPrice.toFixed(2)),
                   alertMode: "below_target",
                   notes: "Criado automaticamente a partir de nota fiscal",
                 });
+
+                console.log(`Auto-created need: "${genericName}" from product "${productName}"`);
               }
             }
           } catch (autoNeedErr) {
