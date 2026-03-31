@@ -135,9 +135,6 @@ export async function POST(req: NextRequest) {
     for (const item of items) {
       const price = positiveNumber(item.price);
       const source = item.source === "receipt" ? "receipt" : "promo";
-      const priceType = ["regular", "loyalty", "bulk"].includes(item.priceType)
-        ? item.priceType
-        : "regular";
 
       let pId = positiveInt(item.productId);
       let mId = positiveInt(item.marketId);
@@ -176,6 +173,22 @@ export async function POST(req: NextRequest) {
       // Market lookup with accent/whitespace normalization
       if (!mId && marketName) {
         mId = await findOrCreateMarket(marketName);
+      }
+
+      // If market has loyalty program, force priceType to loyalty
+      // (all prices in loyalty card flyers are "club" prices)
+      let priceType = ["regular", "loyalty", "bulk"].includes(item.priceType)
+        ? item.priceType
+        : "regular";
+      if (mId) {
+        const [market] = await db
+          .select({ hasLoyalty: markets.hasLoyalty })
+          .from(markets)
+          .where(eq(markets.id, mId))
+          .limit(1);
+        if (market?.hasLoyalty) {
+          priceType = "loyalty";
+        }
       }
 
       if (!pId || !mId || !price) {
