@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { prices, products, markets } from "@/db/schema";
-import { eq, desc, gte, and, sql } from "drizzle-orm";
+import { prices, products, markets, productNeeds, needs } from "@/db/schema";
+import { eq, desc, gte, and, sql, inArray } from "drizzle-orm";
 
 // GET /api/offers — promoções válidas com critério de validade
 export async function GET(req: NextRequest) {
@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const market = searchParams.get("market");
     const category = searchParams.get("category");
+    const onlyNeeds = searchParams.get("onlyNeeds") === "true";
 
     const now = new Date();
 
@@ -64,6 +65,26 @@ export async function GET(req: NextRequest) {
 
     const offers = Array.from(productMap.values())
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // If onlyNeeds=true, filter to products that match at least one active need
+    if (onlyNeeds) {
+      const productIds = offers.map((o) => o.productId);
+      if (productIds.length > 0) {
+        const matched = await db
+          .select({ productId: productNeeds.productId })
+          .from(productNeeds)
+          .innerJoin(needs, eq(productNeeds.needId, needs.id))
+          .where(
+            and(
+              inArray(productNeeds.productId, productIds),
+              eq(needs.active, true)
+            )
+          );
+        const matchedIds = new Set(matched.map((m) => m.productId));
+        return NextResponse.json(offers.filter((o) => matchedIds.has(o.productId)));
+      }
+      return NextResponse.json([]);
+    }
 
     return NextResponse.json(offers);
   } catch (error) {

@@ -7,6 +7,72 @@ import { matchAndPersist } from "@/lib/match-engine";
 import { findOrCreateMarket } from "@/lib/market-lookup";
 import { createInsertionLog } from "@/app/api/logs/route";
 
+// Price sanity check thresholds by category keyword (BRL)
+const PRICE_RANGES: Record<string, { min: number; max: number }> = {
+  cerveja: { min: 1.5, max: 50 },
+  vinho: { min: 5, max: 200 },
+  refrigerante: { min: 2, max: 30 },
+  suco: { min: 2, max: 30 },
+  agua: { min: 1, max: 20 },
+  leite: { min: 2, max: 30 },
+  iogurte: { min: 3, max: 40 },
+  queijo: { min: 5, max: 200 },
+  ovo: { min: 5, max: 50 },
+  arroz: { min: 3, max: 50 },
+  feijao: { min: 4, max: 40 },
+  macarrao: { min: 2, max: 30 },
+  oleo: { min: 4, max: 40 },
+  cafe: { min: 5, max: 80 },
+  acucar: { min: 3, max: 30 },
+  sal: { min: 1, max: 15 },
+  farinha: { min: 2, max: 30 },
+  chocolate: { min: 2, max: 50 },
+  biscoito: { min: 2, max: 30 },
+  pao: { min: 3, max: 30 },
+  carne: { min: 5, max: 200 },
+  frango: { min: 5, max: 80 },
+  peixe: { min: 10, max: 200 },
+  bacalhau: { min: 20, max: 300 },
+  legumes: { min: 2, max: 20 },
+  verdura: { min: 2, max: 20 },
+  fruta: { min: 1, max: 30 },
+  shampoo: { min: 5, max: 80 },
+  sabao: { min: 3, max: 50 },
+  detergente: { min: 2, max: 20 },
+  papel: { min: 5, max: 50 },
+  fralda: { min: 30, max: 300 },
+  default: { min: 0.5, max: 500 },
+};
+
+/**
+ * Check if a price is suspiciously out of range for its category.
+ * Returns { suspicious: true, warning: "..." } if price is clearly wrong,
+ * or { suspicious: false } if price is within acceptable range.
+ */
+function checkPriceSanity(
+  productName: string | null,
+  category: string | null,
+  price: number
+): { suspicious: boolean; warning?: string } {
+  if (!productName && !category) return { suspicious: false };
+
+  const text = `${productName ?? ""} ${category ?? ""}`.toLowerCase();
+
+  for (const [keyword, range] of Object.entries(PRICE_RANGES)) {
+    if (keyword !== "default" && text.includes(keyword)) {
+      if (price < range.min || price > range.max) {
+        return {
+          suspicious: true,
+          warning: `Preço ${price} fora do range esperado para "${keyword}" (R$ ${range.min}-${range.max})`,
+        };
+      }
+      break;
+    }
+  }
+
+  return { suspicious: false };
+}
+
 // Calculate normalized price per base unit (kg, L, or un)
 function calcNormalized(
   price: number,
@@ -49,7 +115,7 @@ function calcNormalized(
   };
 }
 
-// POST /api/prices — salvar preços extraídos de promoções
+// POST /api/prices - salvar preços extraídos de promoções
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -177,6 +243,12 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // P3: Price sanity check - flag obviously wrong OCR readings
+      const sanity = checkPriceSanity(productName, item.category, price);
+      if (sanity.suspicious) {
+        console.warn(`[prices] Suspicious price for "${productName}": ${sanity.warning}`);
+      }
+
       // Resolve unitType/unitQuantity for normalized price calculation
       let effectiveUnitType = itemUnitType;
       let effectiveUnitQuantity = itemUnitQuantity;
@@ -269,7 +341,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/prices — listar promoções recentes (últimos 7 dias)
+// GET /api/prices - listar promoções recentes (últimos 7 dias)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -325,7 +397,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// DELETE /api/prices — deletar um registro de preço
+// DELETE /api/prices - deletar um registro de preço
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

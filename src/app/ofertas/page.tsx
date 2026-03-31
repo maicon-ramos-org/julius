@@ -45,6 +45,8 @@ export default function OfertasPage() {
     if (marketFilter) {
       params.set("market", marketFilter);
     }
+    // onlyNeeds=true: API já filtra usando productNeeds (server-side)
+    params.set("onlyNeeds", "true");
 
     fetch(`/api/offers?${params}`)
       .then((r) => r.json())
@@ -87,29 +89,8 @@ export default function OfertasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marketFilter]);
 
-  // Match each offer against user needs
-  const getMatchedNeed = (offer: Offer): Need | null => {
-    if (needs.length === 0) return null;
-    const offerName = offer.productName.toLowerCase();
-    const offerCategory = (offer.productCategory || "").toLowerCase();
-
-    for (const need of needs) {
-      const needName = need.name.toLowerCase();
-      const needCategory = (need.category || "").toLowerCase();
-      // Name fuzzy match
-      if (
-        offerName.includes(needName) ||
-        needName.includes(offerName.split(" ").slice(0, 3).join(" "))
-      ) {
-        return need;
-      }
-      // Category match
-      if (needCategory && offerCategory && needCategory === offerCategory) {
-        return need;
-      }
-    }
-    return null;
-  };
+  // The API now filters by productNeeds (server-side) via onlyNeeds=true
+  // All offers returned are already matched to at least one active need
 
   const getDaysUntilExpiry = (validUntil: string | null) => {
     if (!validUntil) return null;
@@ -134,8 +115,7 @@ export default function OfertasPage() {
     return `Expira em ${days}d`;
   };
 
-  // Classify offers
-  const needMatches = offers.filter((o) => getMatchedNeed(o) !== null);
+  // Classify offers: urgent (< 7d) or high value (>= R$10) go to "best"
   const urgent = (offer: Offer) => {
     const days = getDaysUntilExpiry(offer.promoValidUntil);
     return days !== null && days < 7;
@@ -145,12 +125,10 @@ export default function OfertasPage() {
     .slice(0, 8);
   const regularOffers = offers;
 
-  const renderCard = (offer: Offer, size: "sm" | "md") => {
+  const renderCard = (offer: Offer, size: "sm" | "md", isMatched: boolean = true) => {
     const days = getDaysUntilExpiry(offer.promoValidUntil);
     const expiryColor = getExpiryColor(days);
     const expiryText = getExpiryText(days);
-    const matched = getMatchedNeed(offer);
-    const isMatched = matched !== null;
 
     return (
       <Card
@@ -263,17 +241,17 @@ export default function OfertasPage() {
       ) : (
         <>
           {/* 🎯 Ofertas que Você Precisa */}
-          {needMatches.length > 0 && (
+          {offers.length > 0 && (
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg border border-green-200">
               <div className="flex items-center gap-2 mb-4">
                 <Star className="h-5 w-5 text-green-600" />
                 <h2 className="text-lg font-bold text-green-900">🎯 Ofertas que Você Precisa</h2>
                 <Badge variant="outline" className="border-green-300 text-green-700">
-                  {needMatches.length} item{needMatches.length > 1 ? "s" : ""}
+                  {offers.length} item{offers.length > 1 ? "s" : ""}
                 </Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {needMatches.map((offer) => renderCard(offer, "sm"))}
+                {offers.map((offer) => renderCard(offer, "sm"))}
               </div>
             </div>
           )}
@@ -302,11 +280,9 @@ export default function OfertasPage() {
               <Badge variant="secondary">
                 {offers.length} produto{offers.length > 1 ? "s" : ""}
               </Badge>
-              {needMatches.length > 0 && (
-                <Badge variant="outline" className="border-green-300 text-green-700">
-                  {needMatches.length} na sua lista
-                </Badge>
-              )}
+              <Badge variant="outline" className="border-green-300 text-green-700">
+                🎯 todas na sua lista
+              </Badge>
             </div>
 
             {offers.length === 0 ? (
