@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { needs, productNeeds, products, prices, markets } from "@/db/schema";
 import { eq, desc, gte, and, sql, or, isNull, inArray } from "drizzle-orm";
 import { getProductStats } from "@/lib/price-analytics";
+import { isBrandExcluded, isBrandPreferred } from "@/lib/brand-preference";
 
 interface DealInfo {
   needId: number;
@@ -162,9 +163,14 @@ export async function GET(req: NextRequest) {
 
           const currentPrice = parseFloat(lp.price);
           const isBelowTarget = targetPrice ? currentPrice <= targetPrice : false;
-          const isPreferred = preferred.some(
-            (p) => mp.productBrand?.toLowerCase().includes(p.toLowerCase())
-          );
+
+          // Intelligent brand preference matching
+          // If brand is excluded (e.g. "exceto Bavaria"), skip it entirely
+          const brandExcluded = isBrandExcluded(mp.productBrand, preferred);
+          if (brandExcluded) continue;
+
+          // isPreferred: brand is explicitly liked (matches preferred list)
+          const preferred2 = isBrandPreferred(mp.productBrand, preferred);
 
           // Use pre-computed stats from cache
           const stats = statsCache.get(mp.productId);
@@ -189,7 +195,7 @@ export async function GET(req: NextRequest) {
             percentBelowAvg: stats?.percentBelowAvg ?? null,
             isGoodDeal: stats?.isGoodDeal ?? false,
             isBelowTarget,
-            isPreferred,
+            isPreferred: preferred2,
           });
         }
       }
